@@ -23,8 +23,8 @@ const partitions = 3 #exonic, periexonic, intragenic
 @info "Spawning workers..."
 pool_size = partitions                          #number of workers to use
 worker_pool = addprocs(pool_size) # add processes up to the worker pool size + 1 control process
-@everywhere Sys.islinux() ? include("/media/main/Bench/PhD/BGHMM/sequencesampler.jl") : include("F:\\PhD\\NGS_binaries\\BGHMM\\sequencesampler.jl")
-@everywhere using DataFrames, Random, Main.SequenceSampler
+
+@everywhere using BGHMM, DataFrames, Random
 @everywhere Random.seed!(1)
 
 #GET SEQUENCE OBSERVATIONS TO TRAIN AND TEST MODELS - PARTITIONING GENOME INTO EXONIC, PERIEXONIC, INTRAGENIC SEQUENCE
@@ -35,7 +35,7 @@ if isfile(sample_output) #if the sample DB has already been built for the curren
 else #otherwise, build it from scratch
     @info "Setting up sampling jobs.."
     #setup worker channels, input gets the genome partitions
-    input_sample_channel, completed_sample_channel = SequenceSampler.setup_sample_jobs(danio_genome_path, danio_gen_index_path, danio_gff_path, sample_set_length, sample_window_min, sample_window_max, perigenic_pad)
+    input_sample_channel, completed_sample_channel = BGHMM.setup_sample_jobs(danio_genome_path, danio_gen_index_path, danio_gff_path, sample_set_length, sample_window_min, sample_window_max, perigenic_pad)
     progress_channel = RemoteChannel(()->Channel{Tuple}(20))
 
     #send sampling jobs to workers
@@ -43,7 +43,7 @@ else #otherwise, build it from scratch
         @info "Sampling.."
         #WORKERS SAMPLE
         for worker in worker_pool[1:partitions]
-            remote_do(SequenceSampler.get_sample_set, worker, input_sample_channel, completed_sample_channel, progress_channel)
+            remote_do(BGHMM.get_sample_set, worker, input_sample_channel, completed_sample_channel, progress_channel)
         end
     else
         @error "No sampling jobs!"

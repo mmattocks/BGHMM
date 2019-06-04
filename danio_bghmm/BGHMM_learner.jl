@@ -30,8 +30,7 @@ pool_size = no_remote_processes + no_local_processes
 worker_pool = [i for i in 2:pool_size+1]
 
 @info "Loading worker libraries everywhere..."
-@everywhere Sys.islinux() ? include("/media/main/Bench/PhD/NGS_binaries/BGHMM/BGHMM.jl") : include("F:\\PhD\\NGS_binaries\\BGHMM\\BGHMM.jl")
-@everywhere using Main.BGHMM, DataFrames, Distributions, Random, MS_HMMBase
+@everywhere using BGHMM, DataFrames, Distributions, Random, MS_HMMBase
 @everywhere Random.seed!(786)
 
 #LOAD SAMPLES
@@ -39,7 +38,7 @@ worker_pool = [i for i in 2:pool_size+1]
 sample_dfs = deserialize(sample_output)
 
 #BUILD TRAINING AND TEST SETS FROM SAMPLES
-training_sets, test_sets = Main.BGHMM.split_obs_sets(sample_dfs)
+training_sets, test_sets = BGHMM.split_obs_sets(sample_dfs)
 
 #INTIIALIZE HMMS
 @info "Setting up HMMs..."

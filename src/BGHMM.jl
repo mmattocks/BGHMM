@@ -1,19 +1,16 @@
-__precompile__()
 
 """
 Utility functions for learning and using background genomic hidden markov models
 """
 module BGHMM
-
-    import BioSequences: BioSequence, DNAAlphabet, DNASequence
-    import DataFrames: DataFrame
+    using BioSequences, DataFrames, GFF3, ProgressMeter
     import Distributed: RemoteChannel
     import Distributions: Dirichlet, Categorical
-    import GFF3: Reader
-    import MS_HMMBase: HMM
-    import Printf: @sprintf
+    import MS_HMMBase: HMM, obs_set_likelihood
     import ProgressMeter: AbstractProgress
+    import Printf: @sprintf
     import Random: rand
+    import Statistics: mean
 
     #function to split random sample dataframe into training and test sets (divide total sequence length by half)
     function split_obs_sets(sample_dfs::Dict{String,DataFrame})
@@ -96,6 +93,9 @@ module BGHMM
     end
 
     include("hmm_tests.jl")
-    include("sequencesampler.jl")
     include("hmm_progressmeter.jl")
+    include("order_coding.jl")
+    include("partition_masker.jl")
+    include("sequence_sampler.jl")
+
 end #module

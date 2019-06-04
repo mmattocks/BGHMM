@@ -22,7 +22,7 @@ sample_dfs = deserialize(sample_output)
 hmm_results_dict = deserialize(hmm_output)
 
 #BUILD TRAINING AND TEST SETS FROM SAMPLES
-training_sets, test_sets = Main.BGHMM.split_obs_sets(sample_dfs)
+training_sets, test_sets = BGHMM.split_obs_sets(sample_dfs)
 
 naive_likelihood_dict = Dict()
 naive_hmm = MS_HMMBase.HMM(ones(1,1),[Categorical(4)])
@@ -98,14 +98,14 @@ plot(exl, exlinset, exr,
     layout=l, guidefontsize=7)
 
 #SELECT BEST MODELS FOR PARTITIONS
-BGHMM_dict = Dict()
+BGHMM_dict = Dict{String,Tuple{HMM, Int64, Float64}}()
 for (jobid, likelihood) in hmm_likelihoods_dict
     partition = jobid[1]
     order = jobid[3]
     if !haskey(BGHMM_dict, partition)
         BGHMM_dict[partition] = (hmm_results_dict[jobid][end][2], order, likelihood)
     else
-        if likelihood > BGHMM_dict[partition][2]
+        if likelihood > BGHMM_dict[partition][3]
             BGHMM_dict[partition] = (hmm_results_dict[jobid][end][2], order, likelihood)
         end
     end
