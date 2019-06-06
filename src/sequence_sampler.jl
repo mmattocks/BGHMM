@@ -9,7 +9,12 @@ function build_feature_df!(GFF3_path::String, feature_type::String, scaffold_exc
                 if seqID != scaffold_exclusion
                     seq_start = GFF3.seqstart(record)
                     seq_end = GFF3.seqend(record)
-                    push!(feature_df, [seqID, seq_start, seq_end]) # push relevant info to the df
+                    if feature_type == "exon" || feature_type == "gene"
+                        seq_strand = convert(Char, GFF3.strand(record))
+                        push!(feature_df, [seqID, seq_start, seq_end, seq_strand])
+                    else
+                        push!(feature_df, [seqID, seq_start, seq_end]) # push relevant info to the df
+                    end
                 end
             end
         end
@@ -73,41 +78,56 @@ function meta_to_feature_coord(meta_start::Int64, meta_end::Int64, feature_df::D
     return seqid, scaffold_start, scaffold_end
 end
 
-function get_metacoord_feature_boundaries(metacoordinate::Int64, feature_df::DataFrame)
+#function to obtain the feature boundaries and strand of the feature that a metacoordinate falls within
+function get_feature_params_from_metacoord(metacoordinate::Int64, feature_df::DataFrame, stranded::Bool)
     feature_row = get_feature_row_index(feature_df, metacoordinate)
     feature_metaStart = feature_df.MetaStart[feature_row]
     feature_metaEnd = feature_df.MetaEnd[feature_row]
-    return feature_metaStart, feature_metaEnd
+    stranded ? feature_strand = feature_df.Strand[feature_row] : feature_strand = '0'
+    return feature_metaStart, feature_metaEnd, feature_strand
 end
 
 #BITARRAY SCAFFOLD REPRESENTATION FUNCTIONS
-function init_scaffold_bitarray(scaffold_id::String, scaffold_df, value::Bool)
+function init_scaffold_bitarray(scaffold_id::String, scaffold_df, value::Bool; stranded::Bool=false)
     scaffold_length = scaffold_df.End[findfirst(isequal(scaffold_id), scaffold_df.SeqID)]
-    value ? (return rscaffold_bitarray = trues(scaffold_length)) : (return rscaffold_bitarray = falses(scaffold_length))
+    if stranded
+        value ? (return rscaffold_bitarray = trues(scaffold_length,2)) : (return rscaffold_bitarray = falses(scaffold_length,2))
+    else
+        value ? (return rscaffold_bitarray = trues(scaffold_length,1)) : (return rscaffold_bitarray = falses(scaffold_length,1))
+    end
 end
 
 function project_features_to_bitarray!(scaffold_feature_sf::SubDataFrame, scaffold_bitarray::BitArray)
     for item in eachrow(scaffold_feature_sf)
-        scaffold_bitarray[item.Start:item.End] = [true for base in item.Start:item.End]
+        scaffold_bitarray[item.Start:item.End,1] = [true for base in item.Start:item.End]
+        if size(scaffold_bitarray)[2] == 2 #if the bitarray is stranded
+            if item.Strand == '+'
+                scaffold_bitarray[item.Start:item.End,1] = [true for base in item.Start:item.End]
+            end
+        end
     end
 end
 
 function subtract_features_from_bitarray!(scaffold_feature_sf::DataFrame, scaffold_bitarray::BitArray)
     for item in eachrow(scaffold_feature_sf)
-        scaffold_bitarray[item.Start:item.End] = [false for base in item.Start:item.End]
+        scaffold_bitarray[item.Start:item.End,1] = [false for base in item.Start:item.End]
     end
 end
 
 function get_feature_df_from_bitarray(scaffold_id::String, scaffold_bitarray::BitArray)
-    scaffold_feature_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[])
-    new_feature_start = findnext(scaffold_bitarray, 1)
-    while new_feature_start != nothing
+    size(scaffold_bitarray)[2] == 2 ? scaffold_feature_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[], Strand=Char[]) : scaffold_feature_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[])
+
+    new_feature_start = findnext(scaffold_bitarray[:,1], 1)
+    while new_feature_start != nothing # while new features are still found on the bitarray
+            if size(scaffold_bitarray)[2] == 2 #if stranded, get strand info
+                scaffold_bitarray[new_feature_start,2] == 1 ? new_feature_strand = '+' : new_feature_strand = '-'
+            end
             if findnext(!eval,scaffold_bitarray,new_feature_start) != nothing
                 new_feature_end = findnext(!eval,scaffold_bitarray,new_feature_start)-1 #find next false after feature start and subtract 1 for feature end
             else
-                new_feature_end = length(scaffold_bitarray)
+                new_feature_end = length(scaffold_bitarray) #if none is found, the end of the feature is the end of hte scaffold
             end
-            push!(scaffold_feature_df,[scaffold_id, new_feature_start, new_feature_end])
+            size(scaffold_bitarray)[2] == 2 ? push!(scaffold_feature_df,[scaffold_id, new_feature_start, new_feature_end, new_feature_strand]) : push!(scaffold_feature_df,[scaffold_id, new_feature_start, new_feature_end]) #push stranded feature info as appropriate
             new_feature_start = findnext(scaffold_bitarray, new_feature_end+1)
     end
     return scaffold_feature_df
@@ -124,10 +144,19 @@ function mask_check(proposal_sequence::DNASequence)
 end
 
 # function to get proposal sequence from genome reader, given coords and scaffold id
-function fetch_sequence(scaffold_id::String, proposal_start::Int64, proposal_end::Int64, genome_reader::BioSequences.FASTA.Reader)
+function fetch_sequence(scaffold_id::String, proposal_start::Int64, proposal_end::Int64, genome_reader::BioSequences.FASTA.Reader, sample_strand)
     identifier = rectify_identifier(scaffold_id)
     scaffold_record = genome_reader[identifier]
-    proposal_sequence = DNASequence(sequence(scaffold_record)[proposal_start:proposal_end])
+    strand_roll = 0
+    if sample_strand == '0' #unstranded samples may be returned with no preference in either orientation
+         strand_roll = rand(1)[1]
+    end
+    if sample_strand == '+' || (sample_strand == '0' && strand_roll > .5)
+        proposal_sequence = DNASequence(sequence(scaffold_record)[proposal_start:proposal_end])
+    else #if negative strand or unstranded with strand_roll <=.5
+        proposal_sequence = reverse_complement(DNASequence(sequence(scaffold_record)[proposal_start:proposal_end]))
+    end
+
     return proposal_sequence
 end
 
@@ -182,7 +211,7 @@ function determine_sample_window(feature_metaStart::Int64, feature_metaEnd::Int6
 end
 
 #function to produce a single sample from a metacoordinate set and the feature df
-function get_sample(metacoordinate_bitarray::BitArray, sample_window_min::Int64, sample_window_max::Int64, sample_df::DataFrame, genome_reader::BioSequences.FASTA.Reader, partitionid::String)
+function get_sample(metacoordinate_bitarray::BitArray, sample_window_min::Int64, sample_window_max::Int64, partition_df::DataFrame, genome_reader::BioSequences.FASTA.Reader, partitionid::String; stranded::Bool=false)
     proposal_acceptance = false
     sample_metaStart = 0
     sample_metaEnd = 0
@@ -190,12 +219,13 @@ function get_sample(metacoordinate_bitarray::BitArray, sample_window_min::Int64,
     sample_End = 0
     sample_sequence = DNASequence("")
     sample_scaffold = ""
+    sample_strand = nothing
     while proposal_acceptance == false
         available_indices = findall(metacoordinate_bitarray) #find all unsampled indices
         window = "FAIL"
         while window == "FAIL"
             start_index = rand(available_indices) #randomly choose from the unsampled indices
-            feature_metaStart, feature_metaEnd = get_metacoord_feature_boundaries(start_index, sample_df)
+            feature_metaStart, feature_metaEnd, sample_strand = get_feature_params_from_metacoord(start_index, partition_df, stranded)
             feature_length = length(feature_metaStart:feature_metaEnd) #find the metaboundaries of the feature the index occurs in
             if feature_length >= sample_window_min #don't bother finding windows on features smaller than min
                 window = determine_sample_window(feature_metaStart, feature_metaEnd, start_index, metacoordinate_bitarray, sample_window_min, sample_window_max) #get an appropriate sampling window around the selected index, given the feature boundaries and params
@@ -204,8 +234,8 @@ function get_sample(metacoordinate_bitarray::BitArray, sample_window_min::Int64,
         if window[1] > length(metacoordinate_bitarray) || window[2] > length(metacoordinate_bitarray)
             @error "Error: metacoords $(window[1]), $(window[2]) in partition $partitionid > $(length(metacoordinate_bitarray))"
         end
-        sample_scaffoldid, sample_scaffold_start, sample_scaffold_end = meta_to_feature_coord(window[1],window[2],sample_df)
-        proposal_sequence = fetch_sequence(sample_scaffoldid, sample_scaffold_start, sample_scaffold_end, genome_reader) #get the sequence associated with the sample window
+        sample_scaffoldid, sample_scaffold_start, sample_scaffold_end = meta_to_feature_coord(window[1],window[2],partition_df)
+        proposal_sequence = fetch_sequence(sample_scaffoldid, sample_scaffold_start, sample_scaffold_end, genome_reader, sample_strand) #get the sequence associated with the sample window
 
         if mask_check(proposal_sequence)
             proposal_acceptance = true #if the sequence passes the mask check, accept the proposed sample
@@ -220,34 +250,49 @@ function get_sample(metacoordinate_bitarray::BitArray, sample_window_min::Int64,
     return sample_scaffold, sample_Start, sample_End, sample_metaStart, sample_metaEnd, sample_sequence
 end
 
-#function to produce a sample set of given parameters
+#function for a Distributed worker to produce a sample set of given parameters
 function get_sample_set(input_sample_jobs::RemoteChannel, completed_sample_jobs::RemoteChannel, progress_updates::RemoteChannel)
-    genome_path, genome_index_path, partition_df, partitionid, sample_set_length, sample_window_min, sample_window_max = take!(input_sample_jobs)
+    genome_path, genome_index_path, partition_df, partitionid, sample_set_length, sample_window_min, sample_window_max = take!(input_sample_jobs) #get the job
+    partitionid == "exon" || partitionid == "periexonic" ? stranded = true : stranded = false #check if the samples have strand info
+
     genome_reader = open(BioSequences.FASTA.Reader, genome_path, index=genome_index_path)
-    sample_df = DataFrame(SampleScaffold=String[],SampleStart=Int64[],SampleEnd=Int64[],SampleSequence=DNASequence[])
-    metacoordinate_bitarray = trues(partition_df.MetaEnd[end])
+    stranded ? sample_df = DataFrame(SampleScaffold=String[],SampleStart=Int64[],SampleEnd=Int64[],SampleSequence=DNASequence[]) : sample_df = DataFrame(SampleScaffold=String[],SampleStart=Int64[],SampleEnd=Int64[],SampleSequence=DNASequence[])
+    metacoordinate_bitarray = trues(partition_df.MetaEnd[end]-partition_df.MetaStart[1]+1)
     sample_set_counter = 0
 
     while sample_set_counter < sample_set_length #while we don't yet have enough sample sequence
-        sample_scaffold::String, sample_Start::Int64, sample_End::Int64, sample_metaStart::Int64, sample_metaEnd::Int64, sample_sequence::DNASequence = get_sample(metacoordinate_bitarray, sample_window_min, sample_window_max,  partition_df, genome_reader, partitionid)
+        sample_scaffold::String, sample_Start::Int64, sample_End::Int64, sample_metaStart::Int64, sample_metaEnd::Int64, sample_sequence::DNASequence = get_sample(metacoordinate_bitarray, sample_window_min, sample_window_max, partition_df, genome_reader, partitionid, stranded=stranded)
         push!(sample_df,[sample_scaffold, sample_Start, sample_End, sample_sequence]) #push the sample to the df
         sample_length = sample_End - sample_Start + 1
         sample_set_counter += sample_length #increase the counter by the length of the sampled sequence
         metacoordinate_bitarray[sample_metaStart:sample_metaEnd] = [false for base in 1:sample_length] #mark these residues as sampled
-        put!(progress_updates, (partitionid, min(sample_set_counter,sample_set_length)))
+        put!(progress_updates, (partitionid, partition_df.SeqID[1]), min(sample_set_counter,sample_set_length)))
     end
     close(genome_reader)
     put!(completed_sample_jobs,(partitionid, sample_df))
 end
 
-function setup_sample_jobs(genome_path::String, genome_index_path::String, gff3_path::String, sample_set_length::Int64, sample_window_min::Int64, sample_window_max::Int64, perigenic_pad::Int64)
+#function to set up Distributed RemoteChannels so partitions can be sampled simultaneously
+function setup_sample_jobs(genome_path::String, genome_index_path::String, gff3_path::String, sample_set_length::Int64, sample_window_min::Int64, sample_window_max::Int64, perigenic_pad::Int64; verbose::Bool=false)
     coordinate_partitions = partition_genome_coordinates(gff3_path, perigenic_pad)
     sample_sets = DataFrame[]
-    input_sample_jobs = RemoteChannel(()->Channel{Tuple}(length(coordinate_partitions))) #channel to hold sampling jobs
-    completed_sample_jobs = RemoteChannel(()->Channel{Tuple}(length(coordinate_partitions))) #channel to hold completed sample dfs
-    for (partitionid, partition) in coordinate_partitions
+    scaffolds = length(unique(coordinate_partitions["exon"].SeqID))+length(unique(coordinate_partitions["intergenic"].SeqID))+length(unique(coordinate_partitions["periexonic"].SeqID))
+    scaffolds_by_partition = scaffolds * length(coordinate_partitions)
+    verbose && @info "Expecting $scaffolds_by_partition"
+    input_sample_jobs = RemoteChannel(()->Channel{Tuple}(scaffolds_by_partition)) #channel to hold sampling jobs
+    completed_sample_jobs = RemoteChannel(()->Channel{Tuple}(scaffolds_by_partition)) #channel to hold completed sample dfs
+    for (partition_id, partition) in coordinate_partitions
+        debugcounter = 0
         add_metacoordinates!(partition)
-        put!(input_sample_jobs, (genome_path, genome_index_path, partition, partitionid, sample_set_length, sample_window_min, sample_window_max))
+        for scaffold in groupby(partition,:SeqID)
+            debugcounter += 1
+            verbose && @info "currently scaffold $debugcounter"
+            scaffold_genome_weight = scaffold.End[end] / partition.MetaEnd[end]
+            weighted_sample_length = round(scaffold_genome_weight  * sample_set_length)
+            verbose && @info "Putting job $partition_id, scaffold $(scaffold.SeqID[1])"
+            put!(input_sample_jobs, (genome_path, genome_index_path, DataFrame(scaffold), partition_id, weighted_sample_length, sample_window_min, sample_window_max))
+
+        end
     end
     return input_sample_jobs, completed_sample_jobs
 end
@@ -261,45 +306,43 @@ function partition_genome_coordinates(gff3_path::String, perigenic_pad::Int64=50
 
     #partition genome into intragenic, periexonic, and exonic coordinate sets
     #assemble exonic featureset
-    exon_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[])
+    exon_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[], Strand=Char[])
     build_feature_df!(gff3_path, "exon", "MT", exon_df)
 
     #project exon coordinates onto the scaffold bitwise, merging overlapping features and returning the merged dataframe
-    merged_exon_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[])
+    merged_exon_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[], Strand=Char[])
     for scaffold_subframe in DataFrames.groupby(exon_df, :SeqID) # for each scaffold subframe that has exon features
         scaffold_id  = scaffold_subframe.SeqID[1] #get the scaffold id
-        scaffold_bitarray = init_scaffold_bitarray(scaffold_id, scaffold_df, false) #init a bitarray of scaffold length
+        scaffold_bitarray = init_scaffold_bitarray(scaffold_id, scaffold_df, false, stranded=true) #init a stranded bitarray of scaffold length
         project_features_to_bitarray!(scaffold_subframe,scaffold_bitarray) #project features as Trues on bitarray of falses
         merged_subframe = get_feature_df_from_bitarray(scaffold_id, scaffold_bitarray) #get a feature df from the projected bitarray
         append!(merged_exon_df,merged_subframe) #append the merged scaffold df to the overall merged df
     end
 
     #assemble gene featureset
-    gene_df =  DataFrame(SeqID = String[], Start = Int64[], End = Int64[])
+    gene_df =  DataFrame(SeqID = String[], Start = Int64[], End = Int64[], Strand = Char[])
     build_feature_df!(gff3_path, "gene", "MT", gene_df)
 
-    if perigenic_pad > 0
-        add_pad_to_coordinates!(gene_df, scaffold_df, perigenic_pad) #if a perigenic pad is specified (to capture promoter elements etc in the periexonic set), apply it to the gene coords
-    end
+    perigenic_pad > 0 && add_pad_to_coordinates!(gene_df, scaffold_df, perigenic_pad) #if a perigenic pad is specified (to capture promoter/downstream elements etc in the periexonic set), apply it to the gene coords
 
     #build intergenic coordinate set by subtracting gene features from scaffold bitarrays
     intergenic_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[])
     for scaffold_subframe in DataFrames.groupby(scaffold_df, :SeqID) # for each scaffold subframe that has exon features
         scaffold_id  = scaffold_subframe.SeqID[1] #get the scaffold id
         scaffold_bitarray = init_scaffold_bitarray(scaffold_id, scaffold_df, true) #init a bitarray of scaffold length
-        if any(isequal(scaffold_id),gene_df.SeqID)
-            scaffold_genes=gene_df[findall(isequal(scaffold_id), gene_df.SeqID), :]
-            subtract_features_from_bitarray!(scaffold_genes,scaffold_bitarray)
+        if any(isequal(scaffold_id),gene_df.SeqID) #if any genes on the scafold
+            scaffold_genes=gene_df[findall(isequal(scaffold_id), gene_df.SeqID), :] #get the gene rows by finding the scaffold_id
+            subtract_features_from_bitarray!(scaffold_genes,scaffold_bitarray) #subtract the gene positions from the scaffold bitarray
         end
         intragenic_subframe = get_feature_df_from_bitarray(scaffold_id, scaffold_bitarray) #get a feature df from the projected bitarray
         append!(intergenic_df,intragenic_subframe) #append the merged scaffold df to the overall merged df
     end
 
     #build periexonic set by projecting gene coordinates onto the scaffold bitwise, then subtracting the exons
-    periexonic_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[])
+    periexonic_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[], Strand=Char[])
     for scaffold_subframe in DataFrames.groupby(gene_df, :SeqID) # for each scaffold subframe that has exon features
         scaffold_id  = scaffold_subframe.SeqID[1] #get the scaffold id
-        scaffold_bitarray = init_scaffold_bitarray(scaffold_id, scaffold_df, false) #init a bitarray of scaffold length
+        scaffold_bitarray = init_scaffold_bitarray(scaffold_id, scaffold_df, false, stranded=true) #init a bitarray of scaffold length
         project_features_to_bitarray!(scaffold_subframe,scaffold_bitarray) #project features as Trues on bitarray of falses
         if any(isequal(scaffold_id),merged_exon_df.SeqID)
             scaffold_exons=merged_exon_df[findall(isequal(scaffold_id), merged_exon_df.SeqID), :]
