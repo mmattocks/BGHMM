@@ -3,7 +3,7 @@
 Utility functions for learning and using background genomic hidden markov models
 """
 module BGHMM
-    using BioSequences, DataFrames, GFF3, ProgressMeter
+    using BioSequences, DataFrames, GenomicFeatures, ProgressMeter
     import Distributed: RemoteChannel
     import Distributions: Dirichlet, Categorical
     import MS_HMMBase: HMM, obs_set_likelihood
@@ -83,7 +83,7 @@ module BGHMM
                 no_emission_symbols = Int(base_alphabet_size^(order_no+1)) #alphabet size for the order
                 emission_dist = generate_emission_dist(no_emission_symbols)
                 #generate the HMM with the appropriate transition matrix and emissions distributions
-                hmm = MS_HMMBase.HMM(transition_matrix, fill(emission_dist,K))
+                hmm = HMM(transition_matrix, fill(emission_dist,K))
                 hmm_results_dict[jobid] = [] #initialise the relevant results array
                 put!(input_hmms, (jobid, iterate, hmm, code_dict[(partition_id, order_no)]))
             end

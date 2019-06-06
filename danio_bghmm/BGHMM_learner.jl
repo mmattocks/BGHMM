@@ -16,12 +16,12 @@ const order_nos = [0,1,2] #DNA kmer order #s to test
 const input_hmms= RemoteChannel(()->Channel{Tuple}(length(Ks)*length(order_nos)*replicates*3)) #channel to hold HMM learning jobs
 const learnt_hmms= RemoteChannel(()->Channel{Tuple}(30)) #channel to take EM iterates off of
 const eps_thresh=1e-3 #stopping/convergence criterion (log probability difference btw subsequent EM iterates)
-const max_iterates=25000
+const max_iterates=5000
 
 #DISTRIBUTED CLUSTER CONSTANTS
 remote_machine = "10.0.0.12"
 no_local_processes = 4
-no_remote_processes = 0
+no_remote_processes = 8
 #SETUP DISTRIBUTED BAUM WELCH LEARNERS
 @info "Spawning workers..."
 addprocs(no_local_processes, topology=:master_worker)

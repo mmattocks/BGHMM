@@ -9,7 +9,7 @@ Sys.islinux() ? sample_output = "/media/main/Bench/PhD/NGS_binaries/BGHMM/BGHMM_
 
 #GENERAL SETUP
 @info "Loading libraries..."
-using BioSequences, Distributed, GFF3, ProgressMeter, Serialization
+using BioSequences, Distributed, GenomicFeatures, ProgressMeter, Serialization
 
 #JOB CONSTANTS
 #CONSTANTS FOR GENOMIC SAMPLING
@@ -23,7 +23,6 @@ const partitions = 3 #exonic, periexonic, intragenic
 @info "Spawning workers..."
 pool_size = partitions                          #number of workers to use
 worker_pool = addprocs(pool_size) # add processes up to the worker pool size + 1 control process
-
 @everywhere using BGHMM, DataFrames, Random
 @everywhere Random.seed!(1)
 

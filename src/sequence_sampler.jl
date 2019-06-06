@@ -252,47 +252,33 @@ end
 
 #function for a Distributed worker to produce a sample set of given parameters
 function get_sample_set(input_sample_jobs::RemoteChannel, completed_sample_jobs::RemoteChannel, progress_updates::RemoteChannel)
-    genome_path, genome_index_path, partition_df, partitionid, sample_set_length, sample_window_min, sample_window_max = take!(input_sample_jobs) #get the job
-    partitionid == "exon" || partitionid == "periexonic" ? stranded = true : stranded = false #check if the samples have strand info
-
+    genome_path, genome_index_path, partition_df, partitionid, sample_set_length, sample_window_min, sample_window_max = take!(input_sample_jobs)
     genome_reader = open(BioSequences.FASTA.Reader, genome_path, index=genome_index_path)
-    stranded ? sample_df = DataFrame(SampleScaffold=String[],SampleStart=Int64[],SampleEnd=Int64[],SampleSequence=DNASequence[]) : sample_df = DataFrame(SampleScaffold=String[],SampleStart=Int64[],SampleEnd=Int64[],SampleSequence=DNASequence[])
-    metacoordinate_bitarray = trues(partition_df.MetaEnd[end]-partition_df.MetaStart[1]+1)
+    sample_df = DataFrame(SampleScaffold=String[],SampleStart=Int64[],SampleEnd=Int64[],SampleSequence=DNASequence[])
+    metacoordinate_bitarray = trues(partition_df.MetaEnd[end])
     sample_set_counter = 0
 
     while sample_set_counter < sample_set_length #while we don't yet have enough sample sequence
-        sample_scaffold::String, sample_Start::Int64, sample_End::Int64, sample_metaStart::Int64, sample_metaEnd::Int64, sample_sequence::DNASequence = get_sample(metacoordinate_bitarray, sample_window_min, sample_window_max, partition_df, genome_reader, partitionid, stranded=stranded)
+        sample_scaffold::String, sample_Start::Int64, sample_End::Int64, sample_metaStart::Int64, sample_metaEnd::Int64, sample_sequence::DNASequence = get_sample(metacoordinate_bitarray, sample_window_min, sample_window_max,  partition_df, genome_reader, partitionid)
         push!(sample_df,[sample_scaffold, sample_Start, sample_End, sample_sequence]) #push the sample to the df
         sample_length = sample_End - sample_Start + 1
         sample_set_counter += sample_length #increase the counter by the length of the sampled sequence
         metacoordinate_bitarray[sample_metaStart:sample_metaEnd] = [false for base in 1:sample_length] #mark these residues as sampled
-        put!(progress_updates, (partitionid, partition_df.SeqID[1]), min(sample_set_counter,sample_set_length)))
+        put!(progress_updates, (partitionid, min(sample_set_counter,sample_set_length)))
     end
     close(genome_reader)
     put!(completed_sample_jobs,(partitionid, sample_df))
 end
 
 #function to set up Distributed RemoteChannels so partitions can be sampled simultaneously
-function setup_sample_jobs(genome_path::String, genome_index_path::String, gff3_path::String, sample_set_length::Int64, sample_window_min::Int64, sample_window_max::Int64, perigenic_pad::Int64; verbose::Bool=false)
+function setup_sample_jobs(genome_path::String, genome_index_path::String, gff3_path::String, sample_set_length::Int64, sample_window_min::Int64, sample_window_max::Int64, perigenic_pad::Int64)
     coordinate_partitions = partition_genome_coordinates(gff3_path, perigenic_pad)
     sample_sets = DataFrame[]
-    scaffolds = length(unique(coordinate_partitions["exon"].SeqID))+length(unique(coordinate_partitions["intergenic"].SeqID))+length(unique(coordinate_partitions["periexonic"].SeqID))
-    scaffolds_by_partition = scaffolds * length(coordinate_partitions)
-    verbose && @info "Expecting $scaffolds_by_partition"
-    input_sample_jobs = RemoteChannel(()->Channel{Tuple}(scaffolds_by_partition)) #channel to hold sampling jobs
-    completed_sample_jobs = RemoteChannel(()->Channel{Tuple}(scaffolds_by_partition)) #channel to hold completed sample dfs
-    for (partition_id, partition) in coordinate_partitions
-        debugcounter = 0
+    input_sample_jobs = RemoteChannel(()->Channel{Tuple}(length(coordinate_partitions))) #channel to hold sampling jobs
+    completed_sample_jobs = RemoteChannel(()->Channel{Tuple}(length(coordinate_partitions))) #channel to hold completed sample dfs
+    for (partitionid, partition) in coordinate_partitions
         add_metacoordinates!(partition)
-        for scaffold in groupby(partition,:SeqID)
-            debugcounter += 1
-            verbose && @info "currently scaffold $debugcounter"
-            scaffold_genome_weight = scaffold.End[end] / partition.MetaEnd[end]
-            weighted_sample_length = round(scaffold_genome_weight  * sample_set_length)
-            verbose && @info "Putting job $partition_id, scaffold $(scaffold.SeqID[1])"
-            put!(input_sample_jobs, (genome_path, genome_index_path, DataFrame(scaffold), partition_id, weighted_sample_length, sample_window_min, sample_window_max))
-
-        end
+        put!(input_sample_jobs, (genome_path, genome_index_path, partition, partitionid, sample_set_length, sample_window_min, sample_window_max))
     end
     return input_sample_jobs, completed_sample_jobs
 end

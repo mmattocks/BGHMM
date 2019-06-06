@@ -133,14 +133,6 @@ version = "0.5.3"
 deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
-[[GFF3]]
-deps = ["Automa", "BGZFStreams", "BioCore", "BioSequences", "BufferedStreams", "GenomicFeatures", "URIParser"]
-git-tree-sha1 = "fed9ffbe17da518ac34e0114081ad158b8712c22"
-repo-rev = "develop"
-repo-url = "git://github.com/BioJulia/GFF3.jl"
-uuid = "af1dc308-cb6b-11e8-32f0-31192efa90f6"
-version = "0.1.0"
-
 [[GenomicFeatures]]
 deps = ["Automa", "BGZFStreams", "BioCore", "BioSequences", "BufferedStreams", "ColorTypes", "DataStructures", "FixedPointNumbers", "IntervalTrees", "Libz", "Random", "Test", "URIParser"]
 git-tree-sha1 = "3d6dd4ec649a45a7a7d0096d388e2701af9946f4"
@@ -231,10 +223,9 @@ uuid = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 version = "0.5.2"
 
 [[PooledArrays]]
-deps = ["Test"]
-git-tree-sha1 = "6ea4cfb9136d3ff2b9d30d6696cd72166a3b837c"
+git-tree-sha1 = "6e8c38927cb6e9ae144f7277c753714861b27d14"
 uuid = "2dfb63ee-cc39-5dd5-95bd-886bf059d720"
-version = "0.5.1"
+version = "0.5.2"
 
 [[Printf]]
 deps = ["Unicode"]
