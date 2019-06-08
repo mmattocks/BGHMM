@@ -1,4 +1,3 @@
-
 """
 Utility functions for learning and using background genomic hidden markov models
 """
@@ -99,3 +98,4 @@ module BGHMM
     include("sequence_sampler.jl")
 
 end #module
+

@@ -3,7 +3,7 @@
     function test_hmm(hmm::HMM, test_set, order)
         order_seqs = get_order_n_seqs(test_set,order) #get the kmer sequences at the appropriate order
         coded_seqs = code_seqs(order_seqs) #numerically code the sequences in trainable format
-        return obs_set_likelihood(hmm, coded_seqs)
+        return obs_set_likelihood(hmm, coded_seqs) #function in MS_HMMBase - hmm.jl
     end
 
     function get_diagonal_array(hmm::HMM)

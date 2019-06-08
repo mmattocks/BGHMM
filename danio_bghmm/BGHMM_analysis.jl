@@ -1,3 +1,4 @@
+
 #JOB FILEPATHS
 Sys.islinux() ? hmm_output = "/media/main/Bench/PhD/NGS_binaries/BGHMM/hmmchains" : hmm_output = "F:\\PhD\\NGS_binaries\\BGHMM\\hmmchains"
 Sys.islinux() ? sample_output = "/media/main/Bench/PhD/NGS_binaries/BGHMM/BGHMM_samples" : sample_output = "F:\\PhD\\NGS_binaries\\BGHMM\\BGHMM_samples" #path to sequence samples for learning
@@ -8,7 +9,7 @@ Sys.islinux() ? selected_hmm_output = "/media/main/Bench/PhD/NGS_binaries/BGHMM/
 using BGHMM, BioSequences, DataFrames, Distributions, MS_HMMBase, ProgressMeter, Plots, Serialization, Statistics
 
 const replicates = 3 #repeat optimisation from this many seperately initialised samples from the prior
-const Ks = [1,2,4] #mosaic class #s to test
+const Ks = [1,2,4,6] #mosaic class #s to test
 const order_nos = [0,1,2] #DNA kmer order #s to test
 const partitions = ["exon", "intergenic", "periexonic"]
 const run_samples = 10000
@@ -41,19 +42,19 @@ hmm_likelihoods_dict = Dict()
     hmm_likelihoods_dict[jobid] = BGHMM.test_hmm(last_hmm, partition_seqs, order)
 end
 
-#COMPOSE DICT OF MEAN STATE RUN LENGTH GIVEN LAST HMM DIAGONALS IN EACH CHAIN, BY JOBID
-hmm_mean_run_length_dict = Dict()
+#COMPOSE DICT OF MAX STATE RUN LENGTH GIVEN LAST HMM DIAGONALS IN EACH CHAIN, BY JOBID
+hmm_max_run_length_dict = Dict()
 @showprogress 1 "Simulating run lengths..." for (jobid, hmm_chain) in hmm_results_dict
     last_hmm = hmm_chain[end][2]
     diagonal = BGHMM.get_diagonal_array(last_hmm)
     diagonal_mrls = BGHMM.sim_run_lengths(diagonal, run_samples)
-    hmm_mean_run_length_dict[jobid] = mean(diagonal_mrls)
+    hmm_max_run_length_dict[jobid] = maximum(diagonal_mrls)
 end
 
 #INITIALIZE DATA MATRICES AND COMPOSE VALUES FOR PLOTTING
 data_matrix_dict = Dict()
-for partition in partitions
-    data_matrix_dict[partition] = Array{Union{Float64, Int64, Symbol}}(undef, length(Ks)*replicates, length(order_nos), 4)
+for order in order_nos
+    data_matrix_dict[order] = Array{Union{Float64, Int64, Symbol}}(undef, length(Ks)*replicates, length(order_nos), 4)
 end
 #Iterating over hmm_likelihoods_dict, compose the data matrices for plots
 for (jobid, likelihood) in hmm_likelihoods_dict
@@ -61,41 +62,33 @@ for (jobid, likelihood) in hmm_likelihoods_dict
     converged = hmm_results_dict[jobid][end][5]
 
     entry_coord = replicate + ((findfirst(isequal(K),Ks) - 1) * replicates)
-    order_series = findfirst(isequal(order),order_nos)
+    partition_series = findfirst(isequal(partition),partitions)
 
-    data_matrix_dict[partition][entry_coord,order_series,1] = likelihood - naive_likelihood_dict[partition]
-    data_matrix_dict[partition][entry_coord,order_series,2] = K
-    data_matrix_dict[partition][entry_coord,order_series,3] = hmm_mean_run_length_dict[jobid]
+    data_matrix_dict[order][entry_coord,partition_series,1] = likelihood - naive_likelihood_dict[partition]
+    data_matrix_dict[order][entry_coord,partition_series,2] = K
+    data_matrix_dict[order][entry_coord,partition_series,3] = hmm_max_run_length_dict[jobid]
 
     if converged
-        data_matrix_dict[partition][entry_coord,order_series,4] = :black
+        data_matrix_dict[order][entry_coord,partition_series,4] = :black
     else
-        data_matrix_dict[partition][entry_coord,order_series,4] = :white
+        data_matrix_dict[order][entry_coord,partition_series,4] = :white
     end
 end
 
-pyplot()
-#PLOT LAYOUT
-l = @layout [a{.5w} b{.2w} c{.2w}
-             d e f
-             g h i]
-
 #SETUP PLOTS
-exl = plot(data_matrix_dict["exon"][:,:,2], label=["0th order", "1st order", "2nd order"], data_matrix_dict["exon"][:,:,1],markercolors=data_matrix_dict["exon"][:,:,4], line=(3, [:solid :dash :dot]), markershape=[:circle :rect :utriangle], legend=:bottomright, xlabel="classes", ylabel="likelihood vs naive")
-exlinset = scatter(data_matrix_dict["exon"][(replicates+1):end,:,2], data_matrix_dict["exon"][(replicates+1):end,:,1],markercolors=data_matrix_dict["exon"][(replicates+1):end,:,4], markershape=[:circle :rect :utriangle], xlims=[1.9,4.1], xticks=[2,4], xlabel="classes")
-exr = plot(data_matrix_dict["exon"][(replicates+1):end,:,2],data_matrix_dict["exon"][(replicates+1):end,:,3],markercolors=data_matrix_dict["exon"][(replicates+1):end,:,4], line=(3, [:solid :dash :dot]), markershape=[:circle :rect :utriangle], xlims=[1.9,4.1], xticks=[2,4], xlabel = "classes", ylabel="mean SRL")
-inl = plot(data_matrix_dict["intergenic"][:,:,2], label=["0th order", "1st order", "2nd order"], data_matrix_dict["intergenic"][:,:,1],markercolors=data_matrix_dict["intergenic"][:,:,4], line=(3, [:solid :dash :dot]), markershape=[:circle :rect :utriangle], legend=false, xlabel="classes", ylabel="likelihood vs naive")
-inlinset = scatter(data_matrix_dict["intergenic"][(replicates+1):end,:,2], data_matrix_dict["intergenic"][(replicates+1):end,:,1],markercolors=data_matrix_dict["intergenic"][(replicates+1):end,:,4], markershape=[:circle :rect :utriangle], xlims=[1.9,4.1], xticks=[2,4], xlabel="classes")
-inr = plot(data_matrix_dict["intergenic"][(replicates+1):end,:,2],data_matrix_dict["intergenic"][(replicates+1):end,:,3],markercolors=data_matrix_dict["intergenic"][(replicates+1):end,:,4], line=(3, [:solid :dash :dot]), markershape=[:circle :rect :utriangle], xlabel = "classes", ylabel="mean SRL")
-pel = plot(data_matrix_dict["periexonic"][:,:,2], label=["0th order", "1st order", "2nd order"], data_matrix_dict["periexonic"][:,:,1],markercolors=data_matrix_dict["periexonic"][:,:,4], line=(3, [:solid :dash :dot]), markershape=[:circle :rect :utriangle], legend=false, xlabel="classes", ylabel="likelihood vs naive")
-pelinset = scatter(data_matrix_dict["periexonic"][(replicates+1):end,:,2], data_matrix_dict["periexonic"][(replicates+1):end,:,1],markercolors=data_matrix_dict["periexonic"][(replicates+1):end,:,4], markershape=[:circle :rect :utriangle], xlims=[1.9,4.1], xticks=[2,4], xlabel="classes")
-per = plot(data_matrix_dict["periexonic"][(replicates+1):end,:,2],data_matrix_dict["periexonic"][(replicates+1):end,:,3],markercolors=data_matrix_dict["periexonic"][(replicates+1):end,:,4], line=(3, [:solid :dash :dot]), markershape=[:circle :rect :utriangle], xlims=[1.9,4.1], xticks=[2,4], xlabel = "classes", ylabel="mean SRL")
+zeroOlh = plot(data_matrix_dict[0][:,:,2], title="0th order", label=["exon", "intergenic", "periexonic"], data_matrix_dict[0][:,:,1],markercolors=data_matrix_dict[0][:,:,4], line=(3, [:solid :dash :dot]), markershape=[:circle :rect :utriangle], legend=:bottomright, xlabel="classes", ylabel="likelihood vs naive")
+zeroOrun = plot(data_matrix_dict[0][(replicates+1):end,:,2], title="0th order", label=["exon", "intergenic", "periexonic"], data_matrix_dict[0][(replicates+1):end,:,3],markercolors=data_matrix_dict[0][(replicates+1):end,:,4], line=(3, [:solid :dash :dot]), markershape=[:circle :rect :utriangle], xlims=[1.9,6.1], xticks=[2,4], xlabel = "classes", ylabel="model maximum mean(SRL)")
+firstOlh = plot(data_matrix_dict[1][:,:,2],  title="1st order", label=["exon", "intergenic", "periexonic"],data_matrix_dict[1][:,:,1],markercolors=data_matrix_dict[1][:,:,4], line=(3, [:solid :dash :dot]), markershape=[:circle :rect :utriangle], legend=:bottomright, xlabel="classes", ylabel="likelihood vs naive")
+firstOrun = plot(data_matrix_dict[1][(replicates+1):end,:,2], title="1st order", label=["exon", "intergenic", "periexonic"], data_matrix_dict[1][(replicates+1):end,:,3],markercolors=data_matrix_dict[1][(replicates+1):end,:,4], line=(3, [:solid :dash :dot]), markershape=[:circle :rect :utriangle], xlabel = "classes", ylabel="model maximum mean(SRL)")
+secondOlh = plot(data_matrix_dict[2][:,:,2], title="2nd order", label=["exon", "intergenic", "periexonic"], data_matrix_dict[2][:,:,1],markercolors=data_matrix_dict[2][:,:,4], line=(3, [:solid :dash :dot]), markershape=[:circle :rect :utriangle], legend=:bottomright, xlabel="classes", ylabel="likelihood vs naive")
+secondOrun = plot(data_matrix_dict[2][(replicates+1):end,:,2], title="2nd order", label=["exon", "intergenic", "periexonic"], data_matrix_dict[2][(replicates+1):end,:,3],markercolors=data_matrix_dict[2][(replicates+1):end,:,4], line=(3, [:solid :dash :dot]), markershape=[:circle :rect :utriangle], xlims=[1.9,6.1], xticks=[2,4], xlabel = "classes", ylabel="model maximum mean(SRL)")
 
-#ASSEMBLE & SAVE DIAGNOSTIC PLOT
-plot(exl, exlinset, exr,
-    inl, inlinset, inr,
-    pel, pelinset, per,
-    layout=l, guidefontsize=7)
+#SAVE PLOTS
+plots_to_print = Dict("zeroOlh"=>zeroOlh, "zeroOrun"=>zeroOrun, "firstOlh"=>firstOlh, "firstOrun"=>firstOrun, "secondOlh"=>secondOlh, "secondOrun"=>secondOrun)
+
+for (filename, plot) in plots_to_print
+    png(plot, filename)
+end
 
 #SELECT BEST MODELS FOR PARTITIONS
 BGHMM_dict = Dict{String,Tuple{HMM, Int64, Float64}}()

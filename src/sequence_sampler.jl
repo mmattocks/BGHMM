@@ -22,6 +22,15 @@ function build_feature_df!(GFF3_path::String, feature_type::String, scaffold_exc
     close(reader)
 end
 
+#function to assemble dataframe of scaffold coords + metacoords given gff3
+function build_scaffold_df(gff3_path)
+    DataFrame(SeqID = String[], Start = Int64[], End = Int64[])
+    build_feature_df!(gff3_path, "supercontig", "MT", scaffold_df)
+    build_feature_df!(gff3_path, "chromosome", "MT", scaffold_df)
+    add_metacoordinates!(scaffold_df)
+    return scaffold_df
+end
+
 #function to add pad to either side of some featureset
 function add_pad_to_coordinates!(feature_df::DataFrame, scaffold_df::DataFrame, pad_size::Int64)
     pad_start_array = zeros(Int64,size(feature_df,1))
@@ -283,12 +292,14 @@ function setup_sample_jobs(genome_path::String, genome_index_path::String, gff3_
     return input_sample_jobs, completed_sample_jobs
 end
 
+#function to partition a genome into coordinate sets of:
+#merged exons
+#"periexonic" sequences (genes with 5' and 3' boundaries projected -/+perigenic_pad bp, minus exons) - includes promoter elements, introns, 3' elements
+#intergenic sequences (everything else)
+#given a valid gff3
 function partition_genome_coordinates(gff3_path::String, perigenic_pad::Int64=500)
     # construct dataframes of scaffolds and metacoordinates
-    scaffold_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[])
-    build_feature_df!(gff3_path, "supercontig", "MT", scaffold_df)
-    build_feature_df!(gff3_path, "chromosome", "MT", scaffold_df)
-    add_metacoordinates!(scaffold_df)
+    scaffold_df = build_scaffold_df(gff3_path)
 
     #partition genome into intragenic, periexonic, and exonic coordinate sets
     #assemble exonic featureset
