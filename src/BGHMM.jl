@@ -63,6 +63,7 @@ module BGHMM
             code_dict[(partition_id, order_no)] = coded_seqs
         end
 
+        #extremely primitive cluster memory management: building the queue with this iterator mostly keeps one machine from getting all the 6th order exonic jobs
         @showprogress 1 "Setting up HMMs..." for i in 1:replicates, order_no in order_nos, K in Ks, (partition_id, partition) in training_sets #for each combination of order and mosaic state number to test for each partition, init HMMs for workers
             jobid = (partition_id, K, order_no, i)
             if haskey(hmm_results_dict, jobid) && length(hmm_results_dict[jobid]) > 0 #true if resuming from incomplete chain
@@ -78,11 +79,12 @@ module BGHMM
 
             else #initialise first HMM in chain
                 iterate = 1
-                transition_matrix = generate_transition_matrix(K)
+                π0 = rand(Dirichlet(ones(K)/K)) #uninformative prior on initial state probabilities
+                π = generate_transition_matrix(K)
                 no_emission_symbols = Int(base_alphabet_size^(order_no+1)) #alphabet size for the order
-                emission_dist = generate_emission_dist(no_emission_symbols)
+                emission_dists = [generate_emission_dist(no_emission_symbols) for i in 1:K]
                 #generate the HMM with the appropriate transition matrix and emissions distributions
-                hmm = HMM(transition_matrix, fill(emission_dist,K))
+                hmm = HMM(π0, π, emission_dists)
                 hmm_results_dict[jobid] = [] #initialise the relevant results array
                 put!(input_hmms, (jobid, iterate, hmm, code_dict[(partition_id, order_no)]))
             end

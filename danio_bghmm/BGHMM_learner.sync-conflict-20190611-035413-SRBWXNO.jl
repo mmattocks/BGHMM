@@ -10,7 +10,7 @@ using Distributed, ProgressMeter, Serialization
 #JOB CONSTANTS
 #CONSTANTS FOR BGHMM LEARNING
 const A = 4 #base alphabet size is 4 (DNA)
-const replicates = 4 #repeat optimisation from this many seperately initialised samples from the prior
+const replicates = 3 #repeat optimisation from this many seperately initialised samples from the prior
 const Ks = [1,2,4,6] #mosaic class #s to test
 const order_nos = [0,1,2] #DNA kmer order #s to test
 const input_hmms= RemoteChannel(()->Channel{Tuple}(length(Ks)*length(order_nos)*replicates*3)) #channel to hold HMM learning jobs

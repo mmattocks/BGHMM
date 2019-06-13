@@ -22,7 +22,7 @@ mutable struct ProgressHMM{T<:Real} <: AbstractProgress
                                offset::Int=0) where T
         tfirst = tlast = time()
         printed = false
-        new{T}(thresh, dt, typemax(T), 3, false, tfirst, tlast, printed, desc, color, output, 0, offset)
+        new{T}(thresh, dt, typemax(T), 2, false, tfirst, tlast, printed, desc, color, output, 0, offset)
     end
 end
 
