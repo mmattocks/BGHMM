@@ -13,7 +13,7 @@ using BioSequences, Distributed, GenomicFeatures, ProgressMeter, Serialization
 
 #JOB CONSTANTS
 #CONSTANTS FOR GENOMIC SAMPLING
-const sample_set_length = Int64(10e6)
+const sample_set_length = Int64(12e6)
 const sample_window_min = 10
 const sample_window_max = 3000
 const perigenic_pad = 500

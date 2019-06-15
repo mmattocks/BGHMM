@@ -14,8 +14,8 @@ function add_partition_masks!(position_df::DataFrame, gff3_path::String, perigen
 
     @showprogress 1 "Masking..." for entry in eachrow(position_df)
         scaffold = entry.SeqID
-        maskLength = length(entry.PositionSequence)
-        seqStart = entry.Start
+        maskLength = length(entry.PadSeq)
+        seqStart = entry.PadStart
 
         scaffold_coords_dict = Dict{String,DataFrame}()
         

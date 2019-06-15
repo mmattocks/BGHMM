@@ -2,7 +2,7 @@
 Utility functions for learning and using background genomic hidden markov models
 """
 module BGHMM
-    using BioSequences, DataFrames, GenomicFeatures, ProgressMeter
+    using BioSequences, BioSequences.FASTA, DataFrames, GenomicFeatures, ProgressMeter
     import Distributed: RemoteChannel
     import Distributions: Dirichlet, Categorical
     import MS_HMMBase: HMM, obs_set_likelihood

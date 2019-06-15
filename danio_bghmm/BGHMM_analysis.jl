@@ -7,7 +7,7 @@ Sys.islinux() ? selected_hmm_output = "/media/main/Bench/PhD/NGS_binaries/BGHMM/
 @info "Loading libraries..."
 using BGHMM, BioSequences, DataFrames, Distributions, MS_HMMBase, ProgressMeter, Plots, Serialization, Statistics
 
-const replicates = 3 #repeat optimisation from this many seperately initialised samples from the prior
+const replicates = 4 #repeat optimisation from this many seperately initialised samples from the prior
 const Ks = [1,2,4,6] #mosaic class #s to test
 const order_nos = [0,1,2] #DNA kmer order #s to test
 const partitions = ["exon", "intergenic", "periexonic"]
@@ -53,7 +53,7 @@ end
 #INITIALIZE DATA MATRICES AND COMPOSE VALUES FOR PLOTTING
 data_matrix_dict = Dict()
 for order in order_nos
-    data_matrix_dict[order] = Array{Union{Float64, Int64, Symbol}}(undef, length(Ks)*replicates, length(order_nos), 4)
+    data_matrix_dict[order] = Array{Union{Float64, Int64, Symbol}}(undef, length(Ks)*replicates, length(partitions), 4)
 end
 #Iterating over hmm_likelihoods_dict, compose the data matrices for plots
 for (jobid, likelihood) in hmm_likelihoods_dict

@@ -122,42 +122,54 @@ end
 #function for a Distributed worker to produce a set of samples of given parameters from genomic sequences
 function get_sample_set(input_sample_jobs::RemoteChannel, completed_sample_jobs::RemoteChannel, progress_updates::RemoteChannel)
     genome_path, genome_index_path, partition_df, partitionid, sample_set_length, sample_window_min, sample_window_max = take!(input_sample_jobs)
-    genome_reader = open(BioSequences.FASTA.Reader, genome_path, index=genome_index_path)
+
+    stranded::Bool = get_strand_dict()[partitionid]
+    scaffold_sequence_record_dict::Dict{String,DNASequence} = build_scaffold_seq_dict(genome_path, genome_index_path)
+
     sample_df = DataFrame(SampleScaffold=String[],SampleStart=Int64[],SampleEnd=Int64[],SampleSequence=DNASequence[])
     metacoordinate_bitarray = trues(partition_df.MetaEnd[end])
     sample_set_counter = 0
 
     while sample_set_counter < sample_set_length #while we don't yet have enough sample sequence
-        sample_scaffold::String, sample_Start::Int64, sample_End::Int64, sample_metaStart::Int64, sample_metaEnd::Int64, sample_sequence::DNASequence = get_sample(metacoordinate_bitarray, sample_window_min, sample_window_max,  partition_df, genome_reader, partitionid)
+        sample_scaffold::String, sample_Start::Int64, sample_End::Int64, sample_metaStart::Int64, sample_metaEnd::Int64, sample_sequence::DNASequence = get_sample(metacoordinate_bitarray, sample_window_min, sample_window_max,  partition_df, scaffold_sequence_record_dict, partitionid, stranded=stranded)
         push!(sample_df,[sample_scaffold, sample_Start, sample_End, sample_sequence]) #push the sample to the df
         sample_length = sample_End - sample_Start + 1
         sample_set_counter += sample_length #increase the counter by the length of the sampled sequence
         metacoordinate_bitarray[sample_metaStart:sample_metaEnd] = [false for base in 1:sample_length] #mark these residues as sampled
         put!(progress_updates, (partitionid, min(sample_set_counter,sample_set_length)))
     end
-    close(genome_reader)
     put!(completed_sample_jobs,(partitionid, sample_df))
 end
                 #get_sample_set() SUBFUNCTIONS
-                # function to get proposal sequence from genome reader, given coords and scaffold id
-                function fetch_sequence(scaffold_id::String, proposal_start::Int64, proposal_end::Int64, genome_reader::BioSequences.FASTA.Reader, sample_strand)
-                    identifier = rectify_identifier(scaffold_id)
-                    scaffold_record = genome_reader[identifier]
-                    strand_roll = 0
-                    if sample_strand == '0' #unstranded samples may be returned with no preference in either orientation
-                        strand_roll = rand(1)[1]
+                #function defining whether partitions respect stranding upon fetching sequence (ie is the sequence fetched in the feature strand orientation, or are we agnostic about the strand we sample?)
+                function get_strand_dict()
+                    return Dict("exon"=>true,"periexonic"=>true,"intergenic"=>false)
+                end
+                #function to obtain a dict of scaffold sequences from a BioSequences FASTA reader
+                function build_scaffold_seq_dict(genome_fa, genome_index)
+                    genome_reader = open(BioSequences.FASTA.Reader, genome_fa, index=genome_index)
+                    seq_dict::Dict{String, DNASequence} = Dict{String,BioSequences.FASTA.Record}()
+                    for record in genome_reader
+                        id = identifier(record)
+                        seq_dict[rectify_identifier(id)]=sequence(record)
                     end
-                    if sample_strand == '+' || (sample_strand == '0' && strand_roll > .5)
-                        proposal_sequence = DNASequence(sequence(scaffold_record)[proposal_start:proposal_end])
-                    else #if negative strand or unstranded with strand_roll <=.5
-                        proposal_sequence = reverse_complement(DNASequence(sequence(scaffold_record)[proposal_start:proposal_end]))
-                    end
+                    close(genome_reader)
+                    return seq_dict
+                end
 
-                    return proposal_sequence
+                # function to convert scaffold ID from that observed by the masked .fna to the more legible one observed by the GFF3
+                function rectify_identifier(scaffold_id::String)
+                    if scaffold_id[1:4] == "CM00" #marks chromosome scaffold
+                        chr_code = scaffold_id[5:10]
+                        chr_no = "$(Int((parse(Float64,chr_code)) - 2884.2))"
+                        return chr_no
+                    else
+                        return scaffold_id
+                    end
                 end
 
                 #function to produce a single sample from a metacoordinate set and the feature df
-                function get_sample(metacoordinate_bitarray::BitArray, sample_window_min::Int64, sample_window_max::Int64, partition_df::DataFrame, genome_reader::BioSequences.FASTA.Reader, partitionid::String; stranded::Bool=false)
+                function get_sample(metacoordinate_bitarray::BitArray, sample_window_min::Int64, sample_window_max::Int64, partition_df::DataFrame,  scaffold_seq_dict::Dict{String,DNASequence}, partitionid::String; stranded::Bool=false)
                     proposal_acceptance = false
                     sample_metaStart = 0
                     sample_metaEnd = 0
@@ -165,13 +177,13 @@ end
                     sample_End = 0
                     sample_sequence = DNASequence("")
                     sample_scaffold = ""
-                    sample_strand = nothing
+                    strand = nothing
                     while proposal_acceptance == false
                         available_indices = findall(metacoordinate_bitarray) #find all unsampled indices
                         window = "FAIL"
                         while window == "FAIL"
                             start_index = rand(available_indices) #randomly choose from the unsampled indices
-                            feature_metaStart, feature_metaEnd, sample_strand = get_feature_params_from_metacoord(start_index, partition_df, stranded)
+                            feature_metaStart, feature_metaEnd, strand = get_feature_params_from_metacoord(start_index, partition_df, stranded)
                             feature_length = length(feature_metaStart:feature_metaEnd) #find the metaboundaries of the feature the index occurs in
                             if feature_length >= sample_window_min #don't bother finding windows on features smaller than min
                                 window = determine_sample_window(feature_metaStart, feature_metaEnd, start_index, metacoordinate_bitarray, sample_window_min, sample_window_max) #get an appropriate sampling window around the selected index, given the feature boundaries and params
@@ -181,7 +193,8 @@ end
                             @error "Error: metacoords $(window[1]), $(window[2]) in partition $partitionid > $(length(metacoordinate_bitarray))"
                         end
                         sample_scaffoldid, sample_scaffold_start, sample_scaffold_end = meta_to_feature_coord(window[1],window[2],partition_df)
-                        proposal_sequence = fetch_sequence(sample_scaffoldid, sample_scaffold_start, sample_scaffold_end, genome_reader, sample_strand) #get the sequence associated with the sample window
+
+                        proposal_sequence = fetch_sequence(sample_scaffoldid, scaffold_seq_dict, sample_scaffold_start, sample_scaffold_end, strand) #get the sequence associated with the sample window
 
                         if mask_check(proposal_sequence)
                             proposal_acceptance = true #if the sequence passes the mask check, accept the proposed sample
@@ -195,24 +208,7 @@ end
                     end
                     return sample_scaffold, sample_Start, sample_End, sample_metaStart, sample_metaEnd, sample_sequence
                 end
-
-                # function to convert scaffold ID from GFF3 format to that observed by the masked .fna
-                function rectify_identifier(scaffold_id::String)
-                    numeric = true
-                    for char in scaffold_id #check if the id is entirely numeric
-                        if ! isnumeric(char)
-                            numeric=false
-                        end
-                    end
-                    if numeric
-                        id_base = 2884.2
-                        chr_no = parse(Int64, scaffold_id)
-                        return identifier = "CM00$(id_base+chr_no)"
-                    else
-                        return scaffold_id
-                    end
-                end
-
+                
                 #function to find a valid sampling window
                 function determine_sample_window(feature_metaStart::Int64, feature_metaEnd::Int64, metacoord::Int64, metacoord_bitarray::BitArray, sample_window_min::Int64, sample_window_max::Int64)
                     window_start = 0
@@ -246,6 +242,7 @@ end
                     end
                 end
 
+
                 # function to check for repetitive stretches or degenerate bases in proposal sequence
                 function mask_check(proposal_sequence::DNASequence)
                     proposal_acceptance = true
@@ -254,6 +251,23 @@ end
                     end
                     return proposal_acceptance
                 end
+
+####SHARED SEQUENCE FETCHER####
+# function to get proposal sequence from dict of scaffold sequences, given coords and scaffold id
+function fetch_sequence(scaffold_id::String, scaffold_seq_dict::Dict{String, DNASequence}, proposal_start::Int64, proposal_end::Int64, strand::Char)
+    if strand == '0' #unstranded samples may be returned with no preference in either orientation
+        rand(1)[1] <=.5 ? strand = '+' : strand = '-'
+    end
+    if strand == '+'
+        proposal_sequence = scaffold_seq_dict[scaffold_id][proposal_start:proposal_end]
+    elseif strand == '-'
+        proposal_sequence = reverse_complement(scaffold_seq_dict[scaffold_id][proposal_start:proposal_end])
+    else
+        @error "Invalid sample code! Must be '+', '-', or '0' (random strand)"
+    end
+
+    return proposal_sequence
+end
 
 ####SHARED BASIC COORDINATE SUBFUNCTIONS####
 # function to push scaffold ID, start, and end points of given featuretype to supplied dataframe
@@ -312,22 +326,6 @@ function add_metacoordinates!(feature_df::DataFrame)
     feature_df.MetaEnd = meta_end_array # metacoordinate contains 'end' metaposition across all genomic material
 end
 
-function get_feature_row_index(feature_df::DataFrame, metacoordinate::Int64)
-    total_feature_bases = feature_df.MetaEnd[end]
-    if metacoordinate == total_feature_bases #edge case of metacoord at end of range
-        return size(feature_df,1) #last index in df
-    else
-        index = findfirst(coord->coord>metacoordinate,feature_df.MetaEnd)
-        if metacoordinate == feature_df.MetaEnd[index-1]
-            return index-1
-        elseif metacoordinate >= feature_df.MetaStart[index] && metacoordinate <= feature_df.MetaEnd[index]
-            return index
-        else
-            @error "Unexpected metacoordinate $metacoordinate in partition of $total_feature_bases bases, with feature start $(feature_df.MetaStart[index]), end $(feature_df.MetaEnd[index])"
-        end
-    end
-end
-
 # function to convert metacoordinate set to scaffold-relative coordinates
 function meta_to_feature_coord(meta_start::Int64, meta_end::Int64, feature_df::DataFrame)
     feature_row = get_feature_row_index(feature_df, meta_start)
@@ -344,4 +342,21 @@ function get_feature_params_from_metacoord(metacoordinate::Int64, feature_df::Da
     feature_metaEnd = feature_df.MetaEnd[feature_row]
     stranded ? feature_strand = feature_df.Strand[feature_row] : feature_strand = '0'
     return feature_metaStart, feature_metaEnd, feature_strand
+end
+
+#function obtain the index of a feature given its metacoordinate
+function get_feature_row_index(feature_df::DataFrame, metacoordinate::Int64)
+    total_feature_bases = feature_df.MetaEnd[end]
+    if metacoordinate == total_feature_bases #edge case of metacoord at end of range
+        return size(feature_df,1) #last index in df
+    else
+        index = findfirst(coord->coord>metacoordinate,feature_df.MetaEnd)
+        if metacoordinate == feature_df.MetaEnd[index-1]
+            return index-1
+        elseif metacoordinate >= feature_df.MetaStart[index] && metacoordinate <= feature_df.MetaEnd[index]
+            return index
+        else
+            @error "Unexpected metacoordinate $metacoordinate in partition of $total_feature_bases bases, with feature start $(feature_df.MetaStart[index]), end $(feature_df.MetaEnd[index])"
+        end
+    end
 end
