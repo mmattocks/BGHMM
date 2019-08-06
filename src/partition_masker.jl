@@ -96,15 +96,3 @@ end
                         return position_partition_id, three_prime_extent, sample_strand
                     end
                 end
-
-
-function get_mask_matrix(mask_matrices::Vector{Matrix{Int64}})
-    output = zeros(Int64, (findmax(length.(mask_matrices))[1]+1), length(mask_matrices), 1) #leave 1 "missing value" 0 after the longest sequence to match code_seqs marking of sequence length
-    @inbounds for (o, mask) in enumerate(mask_matrices)
-        @inbounds for t in 1:(length(mask))
-            output[t,o,1]=mask[t,1] #partition code
-            output[t,o,2]=mask[t,2] #strand code
-        end
-    end
-    return output
-end

@@ -6,9 +6,9 @@ end
 
 #holds a DNA sequence, a higher-order index/kmer sequence, the alphabet used to produce the Kmers, and the order number
 struct N_Order_ntSequence
-  order_no::Int8
   alphabet::CompoundAlphabet
-  seqs::Dict{Tuple{Int64,DNASequence},Array{Tuple{Int64,Kmer}}}
+  seq_lengths::Vector{Int64}
+  order_kmers::Vector{Vector{Kmer}}
 end
 
 #build a CompoundAlphabet for DNA of some order_no
@@ -40,25 +40,30 @@ end
 
 #from a vector of DNASequences, get
 function get_order_n_seqs(seqs::Vector{DNASequence}, order_no::Int64, base_tuple::Tuple=ACGT)
-    n_order_dict = Dict{Tuple{Int64,DNASequence},Array{Tuple{Int64,Kmer}}}()
+    kmer_vecs = Vector{Vector{Kmer}}()
+    length_vec = Vector{Int64}()
     window = order_no + 1
 
-    @inbounds for (i, seq) in enumerate(seqs)
-        kmers = collect(each(Kmer{DNA,window},seq))
-        n_order_dict[(i, seq)] = kmers
+    @inbounds @showprogress 1 "Getting order kmers..." for seq in seqs
+        kmer_vec = Vector{Kmer}()
+        for (i, kmer) in collect(each(Kmer{DNA,window},seq))
+            push!(kmer_vec, kmer)
+        end
+
+        push!(kmer_vecs, kmer_vec)
+        push!(length_vec, length(seq))
     end
 
-    return nordseqs = N_Order_ntSequence(order_no, compound_DNA_alphabet(base_tuple, order_no), n_order_dict)
+    return nordseqs = N_Order_ntSequence(compound_DNA_alphabet(base_tuple, order_no), length_vec, kmer_vecs)
 end
 
 #convert tuple kmers to symbol codes
-function code_seqs(input::N_Order_ntSequence)
-    seqs = collect(keys(input.seqs))
+function code_seqs(input::N_Order_ntSequence, offsets::Array{Int64}=[0 for i in 1:length(input.order_kmers)])
     alphabet = input.alphabet
-    output = zeros(Int64, (findmax(length.(collect(values(input.seqs))))[1]+1), length(seqs)) #leave 1 missing value after the longest sequence for indexing sequence length in MS_HMMBase messages
-    @inbounds for (i, seq) in enumerate(seqs)
-        @inbounds for t in 1:(length(input.seqs[seq]))
-            curr_kmer = input.seqs[seq][t][2]
+    output = zeros(Int64, (maximum(input.seq_lengths)+1), length(input.order_kmers)) #leave 1 missing value after the longest sequence for indexing sequence length in MS_HMMBase messages
+    @inbounds @showprogress 1 "Coding sequences..." for (i, seq) in enumerate(input.order_kmers)
+        for t in 1+offsets[i]:(input.seq_lengths[i])
+            curr_kmer = input.order_kmers[i][t]
             curr_code = alphabet.symbols[curr_kmer]
             output[t,i]=curr_code
         end
