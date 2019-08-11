@@ -84,7 +84,7 @@ end
             end
 
             function project_features_to_bitarray!(scaffold_feature_sf::SubDataFrame, scaffold_bitarray::BitArray)
-                for item in eachrow(scaffold_feature_sf)
+                @inbounds for item in eachrow(scaffold_feature_sf)
                     scaffold_bitarray[item.Start:item.End,1] = [true for base in item.Start:item.End]
                     if size(scaffold_bitarray)[2] == 2 #if the bitarray is stranded
                         if item.Strand == '+'
@@ -95,7 +95,7 @@ end
             end
 
             function subtract_features_from_bitarray!(scaffold_feature_sf::DataFrame, scaffold_bitarray::BitArray)
-                for item in eachrow(scaffold_feature_sf)
+                @inbounds for item in eachrow(scaffold_feature_sf)
                     scaffold_bitarray[item.Start:item.End,1] = [false for base in item.Start:item.End]
                 end
             end
@@ -149,7 +149,7 @@ end
                 function build_scaffold_seq_dict(genome_fa, genome_index)
                     genome_reader = open(BioSequences.FASTA.Reader, genome_fa, index=genome_index)
                     seq_dict::Dict{String, DNASequence} = Dict{String,BioSequences.FASTA.Record}()
-                    for record in genome_reader
+                    @inbounds for record in genome_reader
                         id = identifier(record)
                         seq_dict[rectify_identifier(id)]=sequence(record)
                     end
