@@ -1,0 +1,1 @@
+[![Build Status](https://travis-ci.com/mmattocks/BGHMM.jl.svg?branch=master)](https://travis-ci.com/mmattocks/BGHMM.jl)
