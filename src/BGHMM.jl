@@ -93,6 +93,7 @@ module BGHMM
         return no_input_hmms
     end
 
+    include("bghmm_likelihood.jl")
     include("hmm_tests.jl")
     include("hmm_progressmeter.jl")
     include("order_coding.jl")

@@ -6,6 +6,38 @@ function get_partition_code_dict(dict_forward::Bool=true)
     end
 end
 
+function make_padded_df(position_fasta::String, gff3_path::String, genome_path::String, genome_index_path::String, pad::Int64)
+    position_reader = BioSequences.FASTA.Reader(open((position_fasta),"r"))
+    genome_reader = open(BioSequences.FASTA.Reader, genome_path, index=genome_index_path)
+    scaffold_df = BGHMM.build_scaffold_df(gff3_path)
+    position_df = DataFrame(SeqID = String[], Start=Int64[], End=Int64[], PadSeq = DNASequence[], PadStart=Int64[], RelStart=Int64[], SeqOffset=Int64[])
+    scaffold_seq_dict = BGHMM.build_scaffold_seq_dict(genome_path, genome_index_path)
+
+    for entry in position_reader
+        scaffold = BioSequences.FASTA.identifier(entry)
+
+        if scaffold != "MT"
+            desc_array = split(BioSequences.FASTA.description(entry))
+            pos_start = parse(Int64, desc_array[2])
+            pos_end = parse(Int64, desc_array[4])
+            scaffold_end = scaffold_df.End[findfirst(isequal(scaffold), scaffold_df.SeqID)]
+
+            pad_start=max(1,pos_start-pad)
+            pad_length= pos_start - pad_start
+            seq_offset = pad - pad_length
+            padded_seq = BGHMM.fetch_sequence(scaffold, scaffold_seq_dict, pad_start, pos_end, '+')
+
+            if !hasambiguity(padded_seq)
+                push!(position_df, [scaffold, pos_start, pos_end, padded_seq, pad_start, pad_length, seq_offset])
+            end
+        end
+    end
+    
+    close(position_reader)
+    close(genome_reader)
+    return position_df
+end
+
 function add_partition_masks!(position_df::DataFrame, gff3_path::String, perigenic_pad::Int64=500)
     partitions=["exon", "periexonic", "intergenic"]
     partition_coords_dict = BGHMM.partition_genome_coordinates(gff3_path, perigenic_pad)

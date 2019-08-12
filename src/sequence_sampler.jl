@@ -1,13 +1,13 @@
 ####SAMPLING FUNCTIONS####
 #function to partition genome and set up Distributed RemoteChannels so partitions can be sampled simultaneously
-function setup_sample_jobs(genome_path::String, genome_index_path::String, gff3_path::String, sample_set_length::Int64, sample_window_min::Int64, sample_window_max::Int64, perigenic_pad::Int64)
+function setup_sample_jobs(genome_path::String, genome_index_path::String, gff3_path::String, sample_set_length::Int64, sample_window_min::Int64, sample_window_max::Int64, perigenic_pad::Int64; deterministic::Bool=false)
     coordinate_partitions = partition_genome_coordinates(gff3_path, perigenic_pad)
     sample_sets = DataFrame[]
     input_sample_jobs = RemoteChannel(()->Channel{Tuple}(length(coordinate_partitions))) #channel to hold sampling jobs
     completed_sample_jobs = RemoteChannel(()->Channel{Tuple}(length(coordinate_partitions))) #channel to hold completed sample dfs
     for (partitionid, partition) in coordinate_partitions
         add_metacoordinates!(partition)
-        put!(input_sample_jobs, (genome_path, genome_index_path, partition, partitionid, sample_set_length, sample_window_min, sample_window_max))
+        put!(input_sample_jobs, (genome_path, genome_index_path, partition, partitionid, sample_set_length, sample_window_min, sample_window_max, deterministic))
     end
     return input_sample_jobs, completed_sample_jobs
 end
@@ -24,7 +24,7 @@ function partition_genome_coordinates(gff3_path::String, perigenic_pad::Int64=50
     #partition genome into intragenic, periexonic, and exonic coordinate sets
     #assemble exonic featureset
     exon_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[], Strand=Char[])
-    build_feature_df!(gff3_path, "exon", "MT", exon_df)
+    build_feature_df!(gff3_path, "CDS", "MT", exon_df)
 
     #project exon coordinates onto the scaffold bitwise, merging overlapping features and returning the merged dataframe
     merged_exon_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[], Strand=Char[])
@@ -121,24 +121,26 @@ end
 
 #function for a Distributed worker to produce a set of samples of given parameters from genomic sequences
 function get_sample_set(input_sample_jobs::RemoteChannel, completed_sample_jobs::RemoteChannel, progress_updates::RemoteChannel)
-    genome_path, genome_index_path, partition_df, partitionid, sample_set_length, sample_window_min, sample_window_max = take!(input_sample_jobs)
+    while isready(input_sample_jobs)
+        genome_path, genome_index_path, partition_df, partitionid, sample_set_length, sample_window_min, sample_window_max, deterministic = take!(input_sample_jobs)
 
-    stranded::Bool = get_strand_dict()[partitionid]
-    scaffold_sequence_record_dict::Dict{String,DNASequence} = build_scaffold_seq_dict(genome_path, genome_index_path)
+        stranded::Bool = get_strand_dict()[partitionid]
+        scaffold_sequence_record_dict::Dict{String,DNASequence} = build_scaffold_seq_dict(genome_path, genome_index_path)
 
-    sample_df = DataFrame(SampleScaffold=String[],SampleStart=Int64[],SampleEnd=Int64[],SampleSequence=DNASequence[])
-    metacoordinate_bitarray = trues(partition_df.MetaEnd[end])
-    sample_set_counter = 0
+        sample_df = DataFrame(SampleScaffold=String[],SampleStart=Int64[],SampleEnd=Int64[],SampleSequence=DNASequence[],Strand=Char[])
+        metacoordinate_bitarray = trues(partition_df.MetaEnd[end])
+        sample_set_counter = 0
 
-    while sample_set_counter < sample_set_length #while we don't yet have enough sample sequence
-        sample_scaffold::String, sample_Start::Int64, sample_End::Int64, sample_metaStart::Int64, sample_metaEnd::Int64, sample_sequence::DNASequence = get_sample(metacoordinate_bitarray, sample_window_min, sample_window_max,  partition_df, scaffold_sequence_record_dict, partitionid, stranded=stranded)
-        push!(sample_df,[sample_scaffold, sample_Start, sample_End, sample_sequence]) #push the sample to the df
-        sample_length = sample_End - sample_Start + 1
-        sample_set_counter += sample_length #increase the counter by the length of the sampled sequence
-        metacoordinate_bitarray[sample_metaStart:sample_metaEnd] = [false for base in 1:sample_length] #mark these residues as sampled
-        put!(progress_updates, (partitionid, min(sample_set_counter,sample_set_length)))
+        while sample_set_counter < sample_set_length #while we don't yet have enough sample sequence
+            sample_scaffold::String, sample_Start::Int64, sample_End::Int64, sample_metaStart::Int64, sample_metaEnd::Int64, sample_sequence::DNASequence, strand::Char = get_sample(metacoordinate_bitarray, sample_window_min, sample_window_max,  partition_df, scaffold_sequence_record_dict, partitionid; stranded=stranded, deterministic=deterministic)
+            push!(sample_df,[sample_scaffold, sample_Start, sample_End, sample_sequence, strand]) #push the sample to the df
+            sample_length = sample_End - sample_Start + 1
+            sample_set_counter += sample_length #increase the counter by the length of the sampled sequence
+            metacoordinate_bitarray[sample_metaStart:sample_metaEnd] = [false for base in 1:sample_length] #mark these residues as sampled
+            put!(progress_updates, (partitionid, min(sample_set_counter,sample_set_length)))
+        end
+        put!(completed_sample_jobs,(partitionid, sample_df))
     end
-    put!(completed_sample_jobs,(partitionid, sample_df))
 end
                 #get_sample_set() SUBFUNCTIONS
                 #function defining whether partitions respect stranding upon fetching sequence (ie is the sequence fetched in the feature strand orientation, or are we agnostic about the strand we sample?)
@@ -157,7 +159,7 @@ end
                     return seq_dict
                 end
 
-                # function to convert scaffold ID from that observed by the masked .fna to the more legible one observed by the GFF3
+                # function to convert scaffold ID from that observed by the masked .fna to the more legible one observed by the GRCz11 GFF3
                 function rectify_identifier(scaffold_id::String)
                     if scaffold_id[1:4] == "CM00" #marks chromosome scaffold
                         chr_code = scaffold_id[5:10]
@@ -169,7 +171,7 @@ end
                 end
 
                 #function to produce a single sample from a metacoordinate set and the feature df
-                function get_sample(metacoordinate_bitarray::BitArray, sample_window_min::Int64, sample_window_max::Int64, partition_df::DataFrame,  scaffold_seq_dict::Dict{String,DNASequence}, partitionid::String; stranded::Bool=false)
+                function get_sample(metacoordinate_bitarray::BitArray, sample_window_min::Int64, sample_window_max::Int64, partition_df::DataFrame,  scaffold_seq_dict::Dict{String,DNASequence}, partitionid::String; stranded::Bool=false, deterministic::Bool=false)
                     proposal_acceptance = false
                     sample_metaStart = 0
                     sample_metaEnd = 0
@@ -178,9 +180,12 @@ end
                     sample_sequence = DNASequence("")
                     sample_scaffold = ""
                     strand = nothing
+                    
                     while proposal_acceptance == false
                         available_indices = findall(metacoordinate_bitarray) #find all unsampled indices
                         window = "FAIL"
+                        start_index,feature_metaStart,feature_metaEnd, feature_length = 0,0,0,0
+                        strand = '0'
                         while window == "FAIL"
                             start_index = rand(available_indices) #randomly choose from the unsampled indices
                             feature_metaStart, feature_metaEnd, strand = get_feature_params_from_metacoord(start_index, partition_df, stranded)
@@ -190,11 +195,12 @@ end
                             end
                         end
                         if window[1] > length(metacoordinate_bitarray) || window[2] > length(metacoordinate_bitarray)
-                            @error "Error: metacoords $(window[1]), $(window[2]) in partition $partitionid > $(length(metacoordinate_bitarray))"
+                            @error "Error: metacoords $(window[1]), $(window[2]) in partition $partitionid > $(length(metacoordinate_bitarray)), $start_index, $feature_metaStart, $feature_metaEnd, $feature_length"
+                            @error "Avail indices $available_indices"
                         end
                         sample_scaffoldid, sample_scaffold_start, sample_scaffold_end = meta_to_feature_coord(window[1],window[2],partition_df)
 
-                        proposal_sequence = fetch_sequence(sample_scaffoldid, scaffold_seq_dict, sample_scaffold_start, sample_scaffold_end, strand) #get the sequence associated with the sample window
+                        proposal_sequence = fetch_sequence(sample_scaffoldid, scaffold_seq_dict, sample_scaffold_start, sample_scaffold_end, strand; deterministic=deterministic) #get the sequence associated with the sample window
 
                         if mask_check(proposal_sequence)
                             proposal_acceptance = true #if the sequence passes the mask check, accept the proposed sample
@@ -206,7 +212,7 @@ end
                             sample_sequence=proposal_sequence
                         end
                     end
-                    return sample_scaffold, sample_Start, sample_End, sample_metaStart, sample_metaEnd, sample_sequence
+                    return sample_scaffold, sample_Start, sample_End, sample_metaStart, sample_metaEnd, sample_sequence, strand
                 end
                 
                 #function to find a valid sampling window
@@ -221,14 +227,31 @@ end
                         window_end = feature_metaEnd
                         return window_start, window_end
                     else #if this fails, build the biggest window we can from the sampling point, within the feature
-                        next_sampled_index = findnext(!eval, metacoord_bitarray[feature_metaStart:feature_metaEnd], metacoord-feature_metaStart+1)
-                        prev_sampled_index = findprev(!eval, metacoord_bitarray[feature_metaStart:feature_metaEnd], metacoord-feature_metaStart+1)
-                        next_sampled_index == nothing ? (window_end = feature_metaEnd) : (window_end = metacoord+next_sampled_index-1)
-                        prev_sampled_index == nothing ? (window_start = feature_metaStart) : (window_start = metacoord-prev_sampled_index+1)
+                        featurepos = metacoord - feature_metaStart + 1
+                        next_sampled_index = findnext(!eval, metacoord_bitarray[feature_metaStart:feature_metaEnd], featurepos)
+                        prev_sampled_index = findprev(!eval, metacoord_bitarray[feature_metaStart:feature_metaEnd], featurepos)
+                        next_sampled_index === nothing ? (window_end = feature_metaEnd) : (window_end = next_sampled_index + feature_metaStart - 1)
+                        prev_sampled_index === nothing ? (window_start = feature_metaStart) : (window_start = prev_sampled_index + feature_metaStart - 1)
                         windowsize = window_end - window_start + 1
                         #check to see if this window is bigger than the min, if not, return a failure code
                         windowsize < sample_window_min && return "FAIL"
-                        #check to see if this window is bigger than the max, if so, trim it before returning, randomly chosing to trim 5' or 3'
+                        #check to see if this window is bigger than the max, if so, trim it before returning, removing as evenly as possible around the metacoordinate
+                        # if windowsize > sample_window_max
+                        #     bases_to_trim = windowsize - sample_window_max
+                        #     clearance_5P = metacoord - window_start + 1
+                        #     clearance_3P = window_end - metacoord + 1
+                        #     (OAC,C5,C3) = (0,0,0)
+                        #     while OAC <= bases_to_trim
+                        #         if C5 >= C3 && clearance_5P > 0
+                        #             clearance_5P -= 1
+                        #         elseif C3 > C5 && clearance_3P > 0
+                        #             clearance_3P -= 1
+                        #         end
+                        #         OAC -=1
+                        #     end 
+                        #     window_start = metacoord - clearance_5P + 1
+                        #     window_end = metacoord + clearance_3P + 1
+                        # end
                         if windowsize > sample_window_max
                             bases_to_trim = windowsize - sample_window_max
                             trim_5prime=rand([true,false])
@@ -254,9 +277,9 @@ end
 
 ####SHARED SEQUENCE FETCHER####
 # function to get proposal sequence from dict of scaffold sequences, given coords and scaffold id
-function fetch_sequence(scaffold_id::String, scaffold_seq_dict::Dict{String, DNASequence}, proposal_start::Int64, proposal_end::Int64, strand::Char)
+function fetch_sequence(scaffold_id::String, scaffold_seq_dict::Dict{String, DNASequence}, proposal_start::Int64, proposal_end::Int64, strand::Char; deterministic=false)
     if strand == '0' #unstranded samples may be returned with no preference in either orientation
-        rand(1)[1] <=.5 ? strand = '+' : strand = '-'
+        deterministic ? strand = '+' : (rand(1)[1] <=.5 ? strand = '+' : strand = '-')
     end
     if strand == '+'
         proposal_sequence = scaffold_seq_dict[scaffold_id][proposal_start:proposal_end]
@@ -280,7 +303,7 @@ function build_feature_df!(GFF3_path::String, feature_type::String, scaffold_exc
                 if seqID != scaffold_exclusion
                     seq_start = GFF3.seqstart(record)
                     seq_end = GFF3.seqend(record)
-                    if feature_type == "exon" || feature_type == "gene"
+                    if feature_type == "CDS" || feature_type == "gene"
                         seq_strand = convert(Char, GFF3.strand(record))
                         push!(feature_df, [seqID, seq_start, seq_end, seq_strand])
                     else
@@ -350,11 +373,13 @@ function get_feature_row_index(feature_df::DataFrame, metacoordinate::Int64)
     if metacoordinate == total_feature_bases #edge case of metacoord at end of range
         return size(feature_df,1) #last index in df
     else
-        index = findfirst(coord->coord>metacoordinate,feature_df.MetaEnd)
-        if metacoordinate == feature_df.MetaEnd[index-1]
-            return index-1
-        elseif metacoordinate >= feature_df.MetaStart[index] && metacoordinate <= feature_df.MetaEnd[index]
-            return index
+        index = findfirst(end_coord->end_coord>metacoordinate,feature_df.MetaEnd) #find the index of the feature whose end metacoord is > the query metacoord
+        if index > 1 && metacoordinate == feature_df.MetaEnd[index-1] #if the metacoordinate is the last base of the previous feature
+            if metacoordinate >= feature_df.MetaStart[index-1] && metacoordinate <= feature_df.MetaEnd[index-1] #confirm that the metacoord is in the previous feature
+                return index-1 #return the previous feature index
+            end
+        elseif metacoordinate >= feature_df.MetaStart[index] && metacoordinate <= feature_df.MetaEnd[index] #else confirm that the metacoordinate is in the found feature
+            return index #return the found feature index
         else
             @error "Unexpected metacoordinate $metacoordinate in partition of $total_feature_bases bases, with feature start $(feature_df.MetaStart[index]), end $(feature_df.MetaEnd[index])"
         end
