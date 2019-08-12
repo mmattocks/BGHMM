@@ -236,30 +236,21 @@ end
                         #check to see if this window is bigger than the min, if not, return a failure code
                         windowsize < sample_window_min && return "FAIL"
                         #check to see if this window is bigger than the max, if so, trim it before returning, removing as evenly as possible around the metacoordinate
-                        # if windowsize > sample_window_max
-                        #     bases_to_trim = windowsize - sample_window_max
-                        #     clearance_5P = metacoord - window_start + 1
-                        #     clearance_3P = window_end - metacoord + 1
-                        #     (OAC,C5,C3) = (0,0,0)
-                        #     while OAC <= bases_to_trim
-                        #         if C5 >= C3 && clearance_5P > 0
-                        #             clearance_5P -= 1
-                        #         elseif C3 > C5 && clearance_3P > 0
-                        #             clearance_3P -= 1
-                        #         end
-                        #         OAC -=1
-                        #     end 
-                        #     window_start = metacoord - clearance_5P + 1
-                        #     window_end = metacoord + clearance_3P + 1
-                        # end
                         if windowsize > sample_window_max
                             bases_to_trim = windowsize - sample_window_max
-                            trim_5prime=rand([true,false])
-                            if trim_5prime
-                                window_start += bases_to_trim
-                            else
-                                window_end -= bases_to_trim
-                            end
+                            clearance_5P = metacoord - window_start + 1
+                            clearance_3P = window_end - metacoord + 1
+                            trimmed=0
+                            while trimmed < bases_to_trim
+                                if clearance_5P >= clearance_3P && clearance_5P > 0
+                                    clearance_5P -= 1
+                                elseif clearance_3P > clearance_5P && clearance_3P > 0
+                                    clearance_3P -= 1
+                                end
+                                trimmed +=1
+                            end 
+                            window_start = metacoord - clearance_5P + 1
+                            window_end = metacoord + clearance_3P - 1
                         end
                         return window_start, window_end
                     end

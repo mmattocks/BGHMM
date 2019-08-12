@@ -1,0 +1,14 @@
+language: julia
+os:
+  - linux
+  - windows
+julia:
+  - nightly
+  - 1.1
+matrix:
+  allow_failures:
+    - julia: nightly
+notifications:
+  email: false
+after_success:
+  - julia -e 'import Pkg; cd(Pkg.dir("BGHMM")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'

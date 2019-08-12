@@ -18,15 +18,11 @@ function get_BGHMM_symbol_lh(seq::Matrix{Int64}, hmm::HMM)
     log_γ = fill(-Inf, Tmaxplus1,K)
     log_pobs = logsumexp(MS_HMMBase.log_prob_sum.(log_α[1,:], log_β[1,:]))
 
-    for i = 1:K
-        for t = 1:Tmaxplus1-2
+    @inbounds for i = 1:K, t = 1:length_mask[1]
             log_γ[t,i] = MS_HMMBase.log_prob_sum(log_α[t,i],log_β[t,i],-log_pobs)
-        end
-        t = Tmaxplus1-1 #log_ξ & log_γ T = 0
-        log_γ[t,i] = 0
     end
 
-    for t in 1:size(seq)[1]-2 #iterating down the sequence, stopping short of the final base for which no reasonable estimate is available (we pass along a 0)
+    for t in 1:length_mask[1]
         symbol_lh::Float64 = -Inf #ie 0 in logspace
         for k = 1:K #iterate over states
                 state_symbol_lh::Float64 = MS_HMMBase.log_prob_sum(log_γ[t,k], log(hmm.D[k].p[seq[t]])) #state symbol likelihood is the γ weight * the state symbol probability (log implementation)
