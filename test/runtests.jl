@@ -1,4 +1,4 @@
-using BGHMM,BioSequences,DataFrames,Distributed,ProgressMeter,Test
+using BGHMM,BioSequences,DataFrames,Distributed,MS_HMMBase,ProgressMeter,Test
 
 include("synthetic_sequence_gen.jl")
 
@@ -14,6 +14,8 @@ Sys.islinux() ? posfasta =  (@__DIR__) * "/syntheticpos.fa" : posfasta = (@__DIR
 !isfile(index) && print_synthetic_index(index)
 !isfile(gff) && print_synthetic_gff(gff)
 !isfile(posfasta) && print_synthetic_position(posfasta)
+
+sample_record_dfs = Dict{String,DataFrame}()
 
 @testset "Order coding functions" begin
     test_seqs = [BioSequences.DNASequence("ACGTACGTACGTACGT"),BioSequences.DNASequence("TTTTTTT")]
@@ -82,7 +84,7 @@ end
 
 @testset "Sequence sampler functions" begin
     partitions = 3 #exonic, periexonic, intragenic
-    sample_set_length=75
+    sample_set_length=100
     min_sample_window=5
     max_sample_window=25
     perigenic_pad=250
@@ -167,7 +169,6 @@ end
     BGHMM.get_sample_set(input_sample_channel, completed_sample_channel, progress_channel)
 
     #collect sample dfs by partition id when ready
-    sample_record_dfs = Dict{String,DataFrame}()
     collected_counter = 0
     while collected_counter < partitions
         wait(completed_sample_channel)
@@ -188,4 +189,38 @@ end
             @test sample.SampleSequence == target_seq
         end
     end
+end
+
+@testset "BGHMM setup functions..." begin
+    #CONSTANTS FOR BGHMM LEARNING
+    A = 4 #base alphabet size is 4 (DNA)
+    replicates = 4 #repeat optimisation from this many seperately initialised samples from the prior
+    Ks = [1,2,4,6] #mosaic class #s to test
+    order_nos = [0,1,2] #DNA kmer order #s to test
+    input_hmms= RemoteChannel(()->Channel{Tuple}(length(Ks)*length(order_nos)*replicates*3)) #channel to hold HMM learning jobs
+    learnt_hmms= RemoteChannel(()->Channel{Tuple}(30)) #channel to take EM iterates off of
+    eps_thresh=1e-3 #stopping/convergence criterion (log probability difference btw subsequent EM iterates)
+    max_iterates=15000
+
+    training_sets, test_sets = BGHMM.split_obs_sets(sample_record_dfs)
+    for (partition, training_set) in training_sets
+        @test length(training_set)==2
+    end
+    for (partition, test_set) in test_sets
+        @test length(test_set)==2
+    end
+
+    hmm_results_dict = Dict()
+    no_input_hmms = BGHMM.HMM_setup!(order_nos, Ks, replicates, hmm_results_dict, input_hmms, training_sets, A)
+
+    while isready(input_hmms)
+        jobid, start_iterate, hmm, observations = take!(input_hmms)
+        obs_lengths = [findfirst(iszero,observations[:,o])-1 for o in 1:size(observations)[2]]
+        #make sure input HMMs are valid and try to mle_step them and ensure their 1-step children are valid
+        @test MS_HMMBase.assert_hmm(hmm.π0, hmm.π, hmm.D)
+        new_hmm, prob = MS_HMMBase.mle_step(hmm,observations,obs_lengths)
+        @test MS_HMMBase.assert_hmm(hmm.π0, hmm.π, hmm.D)
+        @test prob < 0
+    end
+
 end
