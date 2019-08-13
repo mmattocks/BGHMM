@@ -203,12 +203,6 @@ end
     max_iterates=15000
 
     training_sets, test_sets = BGHMM.split_obs_sets(sample_record_dfs)
-    for (partition, training_set) in training_sets
-        @test length(training_set)==2
-    end
-    for (partition, test_set) in test_sets
-        @test length(test_set)==2
-    end
 
     hmm_results_dict = Dict()
     no_input_hmms = BGHMM.HMM_setup!(order_nos, Ks, replicates, hmm_results_dict, input_hmms, training_sets, A)
