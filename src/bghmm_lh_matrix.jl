@@ -1,5 +1,6 @@
 #function to obtain positional likelihoods for a sequence under a given HMM. Mostly derived from MS_HMMBase.jl mle function
 function get_BGHMM_symbol_lh(seq::Matrix{Int64}, hmm::HMM)
+    @assert size(seq)[2] == 1 # one sequence at a time only
     symbol_lhs = zeros(length(seq))
     length_mask = [length(seq)-1]
     
@@ -23,7 +24,7 @@ function get_BGHMM_symbol_lh(seq::Matrix{Int64}, hmm::HMM)
     end
 
     for t in 1:length_mask[1]
-        symbol_lh::Float64 = -Inf #ie 0 in logspace
+        symbol_lh::Float64 = -Inf #ie log(p=0)
         for k = 1:K #iterate over states
                 state_symbol_lh::Float64 = MS_HMMBase.log_prob_sum(log_γ[t,k], log(hmm.D[k].p[seq[t]])) #state symbol likelihood is the γ weight * the state symbol probability (log implementation)
                 symbol_lh = logaddexp(symbol_lh, state_symbol_lh) #sum the probabilities over states
@@ -34,7 +35,7 @@ function get_BGHMM_symbol_lh(seq::Matrix{Int64}, hmm::HMM)
     return symbol_lhs[1:end-1] #remove trailing index position
 end
 
-#function to generate substring BGHMM likelihood jobs from an observation set and mask of BGHMM partitions
+#function to calculate BGHMM from an observation set and a dict of BGHMMs
 function BGHMM_likelihood_calc(observations::DataFrame, BGHMM_dict::Dict{String,Tuple{HMM, Int64, Float64}}, code_partition_dict = BGHMM.get_partition_code_dict(false))
     lh_matrix_size = ((findmax(length.(collect(values(observations.PadSeq))))[1]), length(observations.PadSeq))
     BGHMM_lh_matrix = zeros(lh_matrix_size) #T, Strand, O

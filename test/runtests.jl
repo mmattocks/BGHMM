@@ -1,4 +1,4 @@
-using BGHMM,BioSequences,DataFrames,Distributed,MS_HMMBase,ProgressMeter,Test
+using BGHMM,BioSequences,DataFrames,Distributed,Distributions,MS_HMMBase,ProgressMeter,Test
 
 include("synthetic_sequence_gen.jl")
 
@@ -8,7 +8,6 @@ Sys.islinux() ? genome =  (@__DIR__) * "/synthetic.fna" : genome = (@__DIR__) * 
 Sys.islinux() ? index =  (@__DIR__) * "/synthetic.fna.fai" : index = (@__DIR__) * "\\synthetic.fna.fai"
 Sys.islinux() ? gff =  (@__DIR__) * "/synthetic.gff3" : gff = (@__DIR__) * "\\synthetic.gff3"
 Sys.islinux() ? posfasta =  (@__DIR__) * "/syntheticpos.fa" : posfasta = (@__DIR__) * "\\syntheticpos.fa"
-
 
 !isfile(genome) && print_synthetic_fasta(genome)
 !isfile(index) && print_synthetic_index(index)
@@ -217,4 +216,42 @@ end
         @test prob < 0
     end
 
+end
+
+@testset "BGHMM likelihood matrix functions" begin
+    pvec = [.4,.3,.2,.1]
+    π = ones(1,1)
+    D = [Categorical(pvec)]
+    hmm = HMM(π, D)
+
+    testseq=zeros(Int64,5,1)
+    testseq[1:4] = [1;2;3;4]
+    @test isapprox(BGHMM.get_BGHMM_symbol_lh(testseq, hmm)[1], log.(pvec[1]))
+    @test isapprox(sum(BGHMM.get_BGHMM_symbol_lh(testseq,hmm)), MS_HMMBase.obs_set_likelihood(hmm,testseq))
+
+    pvec=[.25,.25,.25,.25]
+    π = [.9 .1
+         .1 .9]
+    D = [Categorical(pvec), Categorical(pvec)]
+    hmm = HMM(π, D)
+
+    @test isapprox(sum(BGHMM.get_BGHMM_symbol_lh(testseq,hmm)), MS_HMMBase.obs_set_likelihood(hmm,testseq))
+
+    testseq=zeros(Int64,1001,1)
+    testseq[1:1000,1]=rand(1:4,1000)
+    
+    @test isapprox(sum(BGHMM.get_BGHMM_symbol_lh(testseq, hmm)),MS_HMMBase.obs_set_likelihood(hmm, testseq))
+
+    Dex = [Categorical([.3, .1, .3, .3]),Categorical([.15, .35, .35, .15])]
+    Dper = [Categorical([.15, .35, .35, .15]),Categorical([.4, .1, .1, .4])]
+    Dint = [Categorical([.4, .1, .1, .4]),Categorical([.45, .05, .05, .45])]
+    BGHMM_dict = Dict{String,Tuple{HMM, Int64, Float64}}()
+    BGHMM_dict["exon"] = (HMM(π, Dex), 0, 0)
+    BGHMM_dict["periexonic"] = (HMM(π, Dper), 0, 0)
+    BGHMM_dict["intergenic"] = (HMM(π, Dint), 0, 0)
+
+    position_length=141;perigenic_pad=250;
+    position_df = BGHMM.make_padded_df(posfasta, gff, genome, index, position_length)
+    BGHMM.add_partition_masks!(position_df, gff, perigenic_pad)
+    lh_matrix=BGHMM.BGHMM_likelihood_calc(position_df,BGHMM_dict)
 end

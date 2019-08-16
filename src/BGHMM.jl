@@ -2,13 +2,13 @@
 Utility functions for learning and using background genomic hidden markov models
 """
 module BGHMM
-    using BioSequences, BioSequences.FASTA, DataFrames, GenomicFeatures, ProgressMeter
+    using BioSequences, BioSequences.FASTA, DataFrames, GenomicFeatures, MS_HMMBase, ProgressMeter
     import Distributed: RemoteChannel
     import Distributions: Dirichlet, Categorical
-    import MS_HMMBase: HMM, obs_set_likelihood
     import ProgressMeter: AbstractProgress
     import Printf: @sprintf
     import Random: rand
+    import StatsFuns: logsumexp, logaddexp
     import Statistics: mean
 
     #function to split random sample dataframe into training and test sets (divide total sequence length by half)
@@ -93,7 +93,7 @@ module BGHMM
         return no_input_hmms
     end
 
-    include("bghmm_likelihood.jl")
+    include("bghmm_lh_matrix.jl")
     include("hmm_tests.jl")
     include("hmm_progressmeter.jl")
     include("order_coding.jl")
