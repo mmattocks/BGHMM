@@ -1,7 +1,7 @@
 #JOB FILEPATHS
 #sample record and hmm serialisation output path
-Sys.islinux() ? sample_output = "/media/main/Bench/PhD/NGS_binaries/BGHMM/BGHMM_samples" : sample_output = "F:\\PhD\\NGS_binaries\\BGHMM\\BGHMM_samples" #path to sequence samples for learning
-Sys.islinux() ? hmm_output = "/media/main/Bench/PhD/NGS_binaries/BGHMM/hmmchains" : hmm_output = "F:\\PhD\\NGS_binaries\\BGHMM\\hmmchains" #path to results
+sample_output = "/bench/PhD/NGS_binaries/BGHMM/BGHMM_samples"
+hmm_output = "/bench/PhD/NGS_binaries/BGHMM/hmmchains"
 
 #GENERAL SETUP
 @info "Loading libraries..."

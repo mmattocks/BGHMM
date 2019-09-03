@@ -1,10 +1,10 @@
 #JOB FILEPATHS
 #GFF3 feature database, FASTA genome and index paths
-Sys.islinux() ? danio_gff_path = "/media/main/Bench/PhD/seq/GRCz11/Danio_rerio.GRCz11.94.gff3" : danio_gff_path = "F:\\PhD\\seq\\GRCz11\\Danio_rerio.GRCz11.94.gff3"
-Sys.islinux() ? danio_genome_path = "/media/main/Bench/PhD/seq/GRCz11/GCA_000002035.4_GRCz11_genomic.fna" : danio_genome_path = "F:\\PhD\\seq\\GRCz11\\GCA_000002035.4_GRCz11_genomic.fna"
-Sys.islinux() ? danio_gen_index_path = "/media/main/Bench/PhD/seq/GRCz11/GCA_000002035.4_GRCz11_genomic.fna.fai" : danio_gen_index_path = "F:\\PhD\\seq\\GRCz11\\GCA_000002035.4_GRCz11_genomic.fna.fai"
+danio_gff_path = "/bench/PhD/seq/GRCz11/Danio_rerio.GRCz11.94.gff3"
+danio_genome_path = "/bench/PhD/seq/GRCz11/GCA_000002035.4_GRCz11_genomic.fna"
+danio_gen_index_path = "/bench/PhD/seq/GRCz11/GCA_000002035.4_GRCz11_genomic.fna.fai"
 #sample record and hmm serialisation output path
-Sys.islinux() ? sample_output = "/media/main/Bench/PhD/NGS_binaries/BGHMM/BGHMM_samples" : sample_output = "F:\\PhD\\NGS_binaries\\BGHMM\\BGHMM_samples"
+sample_output = "/bench/PhD/NGS_binaries/BGHMM/BGHMM_samples"
 #non registered libs
 
 #GENERAL SETUP
