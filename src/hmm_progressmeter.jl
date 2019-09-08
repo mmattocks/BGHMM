@@ -19,18 +19,18 @@ mutable struct ProgressHMM{T<:Real} <: AbstractProgress
                                color::Symbol=:green,
                                output::IO=stderr,
                                offset::Int=0,
-                               start_it::Int=0) where T
+                               start_it::Int=1) where T
         tfirst = tlast = time()
         printed = false
-        new{T}(thresh, dt, typemax(T), 2, false, tfirst, tlast, printed, desc, color, output, 0+start_it, offset)
+        new{T}(thresh, dt, typemax(T), start_it, false, tfirst, tlast, printed, desc, color, output, 0, offset)
     end
 end
 
 ProgressHMM(thresh::Real, dt::Real=0.1, desc::AbstractString="Progress: ",
          color::Symbol=:green, output::IO=stderr;
-         offset::Integer=0, start_it::Integer=0) = ProgressHMM{typeof(thresh)}(thresh, dt=dt, desc=desc, color=color, output=output, offset=offset, start_it=start_it)
+         offset::Integer=0, start_it::Integer=1) = ProgressHMM{typeof(thresh)}(thresh, dt=dt, desc=desc, color=color, output=output, offset=offset, start_it=start_it)
 
-ProgressHMM(thresh::Real, desc::AbstractString, offset::Integer=0, start_it::Integer=0) = ProgressHMM{typeof(thresh)}(thresh, desc=desc, offset=offset, start_it=start_it)
+ProgressHMM(thresh::Real, desc::AbstractString, offset::Integer=0, start_it::Integer=1) = ProgressHMM{typeof(thresh)}(thresh, desc=desc, offset=offset, start_it=start_it)
 
 function update!(p::ProgressHMM, val; options...)
     p.val = val
