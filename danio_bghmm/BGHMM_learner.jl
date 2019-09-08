@@ -20,12 +20,13 @@ const max_iterates=15000
 
 #DISTRIBUTED CLUSTER CONSTANTS
 remote_machine = "10.0.0.3"
-no_local_processes = 1
-no_remote_processes = 0
+no_local_processes = 2
+no_remote_processes = 6
+load_table = [4, 6, 6, 6, 6, 6, 6, 6]
 #SETUP DISTRIBUTED BAUM WELCH LEARNERS
 @info "Spawning workers..."
 addprocs(no_local_processes, topology=:master_worker)
-#addprocs([(remote_machine,no_remote_processes)], tunnel=true, topology=:master_worker)
+addprocs([(remote_machine,no_remote_processes)], tunnel=true, topology=:master_worker)
 pool_size = no_remote_processes + no_local_processes
 worker_pool = [i for i in 2:pool_size+1]
 
@@ -56,7 +57,7 @@ if isready(input_hmms) > 0
     @info "Fitting HMMs.."
     #WORKERS FIT HMMS
     for worker in worker_pool
-        remote_do(MS_HMMBase.fit_mle!, worker, input_hmms, learnt_hmms, eps=eps_thresh, max_iterations=max_iterates)
+        remote_do(MS_HMMBase.fit_mle!, worker, input_hmms, learnt_hmms, load_table, eps_thresh=eps_thresh, max_iterations=max_iterates)
     end
 else
     @warn "No input HMMs (all already converged?), skipping fitting.."
@@ -64,7 +65,6 @@ end
 
 #GET LEARNT HMMS OFF REMOTECHANNEL, SERIALISE AT EVERY ITERATION, UPDATE PROGRESS METERS
 job_counter=no_input_hmms
-job_offset = ones(Bool, pool_size)
 learning_meters=Dict{Tuple, BGHMM.ProgressHMM}()
 overall_meter=Progress(no_input_hmms,"Overall batch progress:")
 
@@ -78,7 +78,11 @@ while job_counter > 0
         end
     else
         offset = workerid - 1
-        learning_meters[jobid] = BGHMM.ProgressHMM(eps_thresh, "Jobid $jobid on worker $workerid converging:", offset)
+        if iterate <=2
+            learning_meters[jobid] = BGHMM.ProgressHMM(eps_thresh, "Jobid $jobid on worker $workerid converging:", offset, 2)
+        else
+            learning_meters[jobid] = BGHMM.ProgressHMM(eps_thresh, "Jobid $jobid on worker $workerid converging:", offset, iterate)
+        end
     end
     #push the hmm and related params to the results_dict
     push!(hmm_results_dict[jobid], [iterate, hmm, log_p, epsilon, converged])
@@ -86,7 +90,6 @@ while job_counter > 0
     if converged || iterate == max_iterates
         global job_counter -= 1
         ProgressMeter.update!(overall_meter, (no_input_hmms-job_counter))
-        job_offset[learning_meters[jobid].offset] = true
         serialize(hmm_output, hmm_results_dict)
         if !isready(input_hmms) #if there are no more jobs to be learnt, retire the worker
             rmprocs(workerid)

@@ -13,24 +13,24 @@ mutable struct ProgressHMM{T<:Real} <: AbstractProgress
     output::IO           # output stream into which the progress is written
     numprintedvalues::Int   # num values printed below progress in last iteration
     offset::Int             # position offset of progress bar (default is 0)
-
     function ProgressHMM{T}(thresh;
                                dt::Real=0.1,
                                desc::AbstractString="Progress: ",
                                color::Symbol=:green,
                                output::IO=stderr,
-                               offset::Int=0) where T
+                               offset::Int=0,
+                               start_it::Int=0) where T
         tfirst = tlast = time()
         printed = false
-        new{T}(thresh, dt, typemax(T), 2, false, tfirst, tlast, printed, desc, color, output, 0, offset)
+        new{T}(thresh, dt, typemax(T), 2, false, tfirst, tlast, printed, desc, color, output, 0+start_it, offset)
     end
 end
 
 ProgressHMM(thresh::Real, dt::Real=0.1, desc::AbstractString="Progress: ",
          color::Symbol=:green, output::IO=stderr;
-         offset::Integer=0) = ProgressHMM{typeof(thresh)}(thresh, dt=dt, desc=desc, color=color, output=output, offset=offset)
+         offset::Integer=0, start_it::Integer=0) = ProgressHMM{typeof(thresh)}(thresh, dt=dt, desc=desc, color=color, output=output, offset=offset, start_it=start_it)
 
-ProgressHMM(thresh::Real, desc::AbstractString, offset::Integer=0) = ProgressHMM{typeof(thresh)}(thresh, desc=desc, offset=offset)
+ProgressHMM(thresh::Real, desc::AbstractString, offset::Integer=0, start_it::Integer=0) = ProgressHMM{typeof(thresh)}(thresh, desc=desc, offset=offset, start_it=start_it)
 
 function update!(p::ProgressHMM, val; options...)
     p.val = val

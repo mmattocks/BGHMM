@@ -63,7 +63,6 @@ module BGHMM
             code_dict[(partition_id, order_no)] = coded_seqs
         end
 
-        #extremely primitive cluster memory management: building the queue with this iterator mostly keeps one machine from getting all the 6th order exonic jobs
         @showprogress 1 "Setting up HMMs..." for i in 1:replicates, order_no in order_nos, K in Ks, (partition_id, partition) in training_sets #for each combination of order and mosaic state number to test for each partition, init HMMs for workers
             jobid = (partition_id, K, order_no, i)
             if haskey(hmm_results_dict, jobid) && length(hmm_results_dict[jobid]) > 0 #true if resuming from incomplete chain
