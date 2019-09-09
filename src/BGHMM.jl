@@ -78,7 +78,6 @@ module BGHMM
                 end
 
             else #initialise first HMM in chain
-                iterate = 1
                 π0 = rand(Dirichlet(ones(K)/K)) #uninformative prior on initial state probabilities
                 π = generate_transition_matrix(K)
                 no_emission_symbols = Int(base_alphabet_size^(order_no+1)) #alphabet size for the order
@@ -86,7 +85,7 @@ module BGHMM
                 #generate the HMM with the appropriate transition matrix and emissions distributions
                 hmm = HMM(π0, π, emission_dists)
                 hmm_results_dict[jobid] = [] #initialise the relevant results array
-                put!(input_hmms, (jobid, iterate, hmm, 0.0, code_dict[(partition_id, order_no)]))
+                put!(input_hmms, (jobid, 1, hmm, 0.0, code_dict[(partition_id, order_no)]))
             end
         end
 

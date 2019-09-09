@@ -23,7 +23,7 @@ const max_iterates=15000
 remote_machine = "10.0.0.2"
 no_local_processes = 1
 no_remote_processes = 1
-load_table = [(0,0,[""]),(1,6,[""]),(1,4,[""])]
+load_table = [(0,0,[""]),(4,6,[""]),(1,4,[""])]
 #SETUP DISTRIBUTED BAUM WELCH LEARNERS
 @info "Spawning workers..."
 addprocs(no_local_processes, topology=:master_worker)
