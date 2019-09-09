@@ -13,16 +13,17 @@ const A = 4 #base alphabet size is 4 (DNA)
 const replicates = 4 #repeat optimisation from this many seperately initialised samples from the prior
 const Ks = [1,2,4,6] #mosaic class #s to test
 const order_nos = [0,1,2] #DNA kmer order #s to test
-const input_hmms= RemoteChannel(()->Channel{Tuple}(length(Ks)*length(order_nos)*replicates*3)) #channel to hold HMM learning jobs
+const no_models = length(Ks)*length(order_nos)*replicates
+const input_hmms= RemoteChannel(()->Channel{Tuple}(no_models*3)) #channel to hold HMM learning jobs
 const learnt_hmms= RemoteChannel(()->Channel{Tuple}(30)) #channel to take EM iterates off of
 const eps_thresh=1e-3 #stopping/convergence criterion (log probability difference btw subsequent EM iterates)
 const max_iterates=15000
 
 #DISTRIBUTED CLUSTER CONSTANTS
 remote_machine = "10.0.0.3"
-no_local_processes = 2
-no_remote_processes = 6
-load_table = [replicates*length(Ks)*length(order_nos),4, 4, 6, 6, 6, 6, 6, 6]
+no_local_processes = 1
+no_remote_processes = 1
+load_table = [(0,0,[""]),(1,4,[""]),(1,6,[""])]
 #SETUP DISTRIBUTED BAUM WELCH LEARNERS
 @info "Spawning workers..."
 addprocs(no_local_processes, topology=:master_worker)
@@ -57,7 +58,7 @@ if isready(input_hmms) > 0
     @info "Fitting HMMs.."
     #WORKERS FIT HMMS
     for worker in worker_pool
-        remote_do(MS_HMMBase.fit_mle!, worker, input_hmms, learnt_hmms, load_table, eps_thresh=eps_thresh, max_iterations=max_iterates)
+        remote_do(MS_HMMBase.fit_mle!, worker, input_hmms, learnt_hmms, no_models, load_table, eps_thresh=eps_thresh, max_iterations=max_iterates)
     end
 else
     @warn "No input HMMs (all already converged?), skipping fitting.."
