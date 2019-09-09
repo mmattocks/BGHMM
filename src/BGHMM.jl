@@ -71,7 +71,8 @@ module BGHMM
                 if !job_convergence #push the last hmm iterate for nonconverged chains to the input channel
                     iterate = hmm_results_dict[jobid][lastindex][1]
                     hmm =  hmm_results_dict[jobid][lastindex][2]
-                    put!(input_hmms, (jobid, iterate, hmm, code_dict[(partition_id, order_no)]))
+                    last_norm = hmm_results_dict[jobid][lastindex][3]
+                    put!(input_hmms, (jobid, iterate, hmm, last_norm, code_dict[(partition_id, order_no)]))
                 else #skip any jobs that have converged from previous runs
                     no_input_hmms -= 1
                 end
@@ -85,7 +86,7 @@ module BGHMM
                 #generate the HMM with the appropriate transition matrix and emissions distributions
                 hmm = HMM(π0, π, emission_dists)
                 hmm_results_dict[jobid] = [] #initialise the relevant results array
-                put!(input_hmms, (jobid, iterate, hmm, code_dict[(partition_id, order_no)]))
+                put!(input_hmms, (jobid, iterate, hmm, 0.0, code_dict[(partition_id, order_no)]))
             end
         end
 

@@ -207,7 +207,8 @@ end
     no_input_hmms = BGHMM.HMM_setup!(order_nos, Ks, replicates, hmm_results_dict, input_hmms, training_sets, A)
 
     while isready(input_hmms)
-        jobid, start_iterate, hmm, observations = take!(input_hmms)
+        jobid, start_iterate, hmm, last_norm, observations = take!(input_hmms)
+        @test last_norm == 0
         obs_lengths = [findfirst(iszero,observations[:,o])-1 for o in 1:size(observations)[2]]
         #make sure input HMMs are valid and try to mle_step them and ensure their 1-step children are valid
         @test MS_HMMBase.assert_hmm(hmm.π0, hmm.π, hmm.D)

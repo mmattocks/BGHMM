@@ -20,10 +20,10 @@ const eps_thresh=1e-3 #stopping/convergence criterion (log probability differenc
 const max_iterates=15000
 
 #DISTRIBUTED CLUSTER CONSTANTS
-remote_machine = "10.0.0.3"
+remote_machine = "10.0.0.2"
 no_local_processes = 1
 no_remote_processes = 1
-load_table = [(0,0,[""]),(1,4,[""]),(1,6,[""])]
+load_table = [(0,0,[""]),(1,6,[""]),(1,4,[""])]
 #SETUP DISTRIBUTED BAUM WELCH LEARNERS
 @info "Spawning workers..."
 addprocs(no_local_processes, topology=:master_worker)
