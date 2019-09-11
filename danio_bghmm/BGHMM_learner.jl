@@ -21,9 +21,9 @@ const max_iterates=15000
 
 #DISTRIBUTED CLUSTER CONSTANTS
 remote_machine = "10.0.0.2"
-no_local_processes = 1
-no_remote_processes = 1
-load_table = [(0,0,[""]),(4,6,[""]),(1,4,[""])]
+no_local_processes = 2
+no_remote_processes = 2
+load_table = [(0,0,[""],0),(6,6,[""],0),(4,6,[""],10),(4,4,[""],0),(1,4,[""],5)]
 #SETUP DISTRIBUTED BAUM WELCH LEARNERS
 @info "Spawning workers..."
 addprocs(no_local_processes, topology=:master_worker)
