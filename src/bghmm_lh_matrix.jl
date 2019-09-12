@@ -17,16 +17,16 @@ function get_BGHMM_symbol_lh(seq::Matrix{Int64}, hmm::HMM)
     log_β = permutedims(log_β, [2,1,3])
 
     log_γ = fill(-Inf, Tmaxplus1,K)
-    log_pobs = logsumexp(lps.(log_α[1,:], log_β[1,:]))
+    log_pobs = logsumexp(CLHMM.lps.(log_α[1,:], log_β[1,:]))
 
     @inbounds for i = 1:K, t = 1:length_mask[1]
-            log_γ[t,i] = lps(log_α[t,i],log_β[t,i],-log_pobs)
+            log_γ[t,i] = CLHMM.lps(log_α[t,i],log_β[t,i],-log_pobs)
     end
 
     for t in 1:length_mask[1]
         symbol_lh::Float64 = -Inf #ie log(p=0)
         for k = 1:K #iterate over states
-                state_symbol_lh::Float64 = lps(log_γ[t,k], log(hmm.D[k].p[seq[t]])) #state symbol likelihood is the γ weight * the state symbol probability (log implementation)
+                state_symbol_lh::Float64 = CLHMM.lps(log_γ[t,k], log(hmm.D[k].p[seq[t]])) #state symbol likelihood is the γ weight * the state symbol probability (log implementation)
                 symbol_lh = logaddexp(symbol_lh, state_symbol_lh) #sum the probabilities over states
         end
         symbol_lhs[t] = symbol_lh
