@@ -57,11 +57,19 @@ git-tree-sha1 = "5d55b9486590fdda5905c275bb21ce1f0754020f"
 uuid = "e1450e63-4bb3-523b-b2a4-4ffa8c0fd77d"
 version = "1.0.0"
 
+[[CLHMM]]
+deps = ["Distributed", "Distributions", "HMMBase", "StatsFuns"]
+git-tree-sha1 = "f5444eba8436b6de661c3aa4a3bdb0ee522200c6"
+repo-rev = "master"
+repo-url = "git://github.com/mmattocks/CLHMM.jl"
+uuid = "50393821-5328-4e9b-b13d-f3f5dbde8b0c"
+version = "0.1.0"
+
 [[CategoricalArrays]]
-deps = ["Compat", "DataAPI", "Future", "JSON", "Missings", "Printf", "Reexport"]
-git-tree-sha1 = "13240cfcc884837fc1aa89b60d500a652bcc3f10"
+deps = ["Compat", "DataAPI", "Future", "JSON", "Missings", "Printf", "Reexport", "Unicode"]
+git-tree-sha1 = "5f4400b24adb1fbed17a9dcc1e8ab8aaf5b03d1f"
 uuid = "324d7699-5711-5eae-9e2f-1d82baa6b597"
-version = "0.5.5"
+version = "0.6.0"
 
 [[CodecZlib]]
 deps = ["BinaryProvider", "Libdl", "TranscodingStreams"]
@@ -149,6 +157,12 @@ git-tree-sha1 = "3d6dd4ec649a45a7a7d0096d388e2701af9946f4"
 uuid = "899a7d2d-5c61-547b-bef9-6698a8d05446"
 version = "1.0.0"
 
+[[HMMBase]]
+deps = ["Distributions", "LinearAlgebra", "StaticArrays", "StatsFuns"]
+git-tree-sha1 = "0204ea2805939ac2e533ec3307ba483ca2c5b130"
+uuid = "b2b3ca75-8444-5ffa-85e6-af70e2b64fe7"
+version = "0.0.14"
+
 [[IndexableBitVectors]]
 deps = ["Random", "Test"]
 git-tree-sha1 = "b7f5e42dc867b8a8654a5f899064632dac05bc82"
@@ -195,23 +209,14 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
-[[MS_HMMBase]]
-deps = ["Distributed", "Distributions", "LinearAlgebra", "StaticArrays", "StatsFuns"]
-git-tree-sha1 = "1dce5fd948c380d83556b2dc7aaa8076c610856f"
-repo-rev = "master"
-repo-url = "git://github.com/mmattocks/MS_HMMBase.jl"
-uuid = "f5650aa0-5f46-11e9-253e-a98edbbd51a5"
-version = "0.0.13"
-
 [[Markdown]]
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[Missings]]
-deps = ["SparseArrays", "Test"]
-git-tree-sha1 = "f0719736664b4358aa9ec173077d4285775f8007"
+git-tree-sha1 = "29858ce6c8ae629cf2d733bffa329619a1c843d0"
 uuid = "e1d29d7a-bbdc-5cf2-9ac0-f12de2c33e28"
-version = "0.4.1"
+version = "0.4.2"
 
 [[Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"

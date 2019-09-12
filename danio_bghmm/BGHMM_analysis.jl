@@ -5,7 +5,7 @@ selected_hmm_output = "/bench/PhD/NGS_binaries/BGHMM/selected_BGHMMs"
 
 #GENERAL SETUP
 @info "Loading libraries..."
-using BGHMM, BioSequences, DataFrames, Distributions, MS_HMMBase, ProgressMeter, Plots, Serialization, Statistics
+using BGHMM, BioSequences, DataFrames, Distributions, CLHMM, ProgressMeter, Plots, Serialization, Statistics
 
 const replicates = 4 #repeat optimisation from this many seperately initialised samples from the prior
 const Ks = [1,2,4,6] #mosaic class #s to test
@@ -25,7 +25,7 @@ hmm_results_dict = deserialize(hmm_output)
 training_sets, test_sets = BGHMM.split_obs_sets(sample_dfs)
 
 naive_likelihood_dict = Dict()
-naive_hmm = MS_HMMBase.HMM(ones(1,1),[Categorical(4)])
+naive_hmm = HMM(ones(1,1),[Categorical(4)])
 
 #For all partitions, calculate the test set's probability given the naive model
 @showprogress 1 "Calculating naive model test set likelihoods..." for partition in partitions

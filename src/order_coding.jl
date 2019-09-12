@@ -60,7 +60,7 @@ end
 #convert tuple kmers to symbol codes
 function code_seqs(input::N_Order_ntSequence, offsets::Array{Int64}=[0 for i in 1:length(input.order_kmers)])
     alphabet = input.alphabet
-    output = zeros(Int64, (maximum([length(seq) for seq in input.order_kmers])+1), length(input.order_kmers)) #leave 1 missing value after the longest sequence for indexing sequence length in MS_HMMBase messages
+    output = zeros(Int64, (maximum([length(seq) for seq in input.order_kmers])+1), length(input.order_kmers)) #leave 1 missing value after the longest sequence for indexing sequence length in CLHMM messages
     for (i, seq) in enumerate(input.order_kmers)
         for t in 1:length(seq)
             curr_kmer = input.order_kmers[i][t]
