@@ -21,9 +21,8 @@ const max_iterates=15000
 
 #DISTRIBUTED CLUSTER CONSTANTS
 remote_machine = "10.0.0.2"
-no_local_processes = 2
-no_remote_processes = 2
-load_table = [(0,0,[""],0),(6,6,[""],0),(4,6,[""],10),(4,4,[""],0),(1,4,[""],5)]
+no_local_processes = 12
+no_remote_processes = 4
 #SETUP DISTRIBUTED BAUM WELCH LEARNERS
 @info "Spawning workers..."
 addprocs(no_local_processes, topology=:master_worker)
@@ -58,7 +57,7 @@ if isready(input_hmms) > 0
     @info "Fitting HMMs.."
     #WORKERS FIT HMMS
     for worker in worker_pool
-        remote_do(linear_, worker, input_hmms, learnt_hmms, no_models, load_table, eps_thresh=eps_thresh, max_iterations=max_iterates)
+        remote_do(linear_hmm_converger!, worker, input_hmms, learnt_hmms, no_models, eps_thresh=eps_thresh, max_iterations=max_iterates)
     end
 else
     @warn "No input HMMs (all already converged?), skipping fitting.."
