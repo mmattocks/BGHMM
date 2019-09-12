@@ -32,7 +32,7 @@ pool_size = no_remote_processes + no_local_processes
 worker_pool = [i for i in 2:pool_size+1]
 
 @info "Loading worker libraries everywhere..."
-@everywhere using BGHMM, DataFrames, Distributions, Random, MS_HMMBase
+@everywhere using BGHMM, DataFrames, Distributions, Random, CLHMM
 @everywhere Random.seed!(786)
 
 #LOAD SAMPLES
@@ -58,7 +58,7 @@ if isready(input_hmms) > 0
     @info "Fitting HMMs.."
     #WORKERS FIT HMMS
     for worker in worker_pool
-        remote_do(MS_HMMBase.fit_mle!, worker, input_hmms, learnt_hmms, no_models, load_table, eps_thresh=eps_thresh, max_iterations=max_iterates)
+        remote_do(linear_, worker, input_hmms, learnt_hmms, no_models, load_table, eps_thresh=eps_thresh, max_iterations=max_iterates)
     end
 else
     @warn "No input HMMs (all already converged?), skipping fitting.."

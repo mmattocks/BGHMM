@@ -1,4 +1,4 @@
-using BGHMM,BioSequences,DataFrames,Distributed,Distributions,MS_HMMBase,ProgressMeter,Test
+using BGHMM,BioSequences,CLHMM,DataFrames,Distributed,Distributions,ProgressMeter,Test
 
 include("synthetic_sequence_gen.jl")
 
@@ -211,9 +211,9 @@ end
         @test last_norm == 0
         obs_lengths = [findfirst(iszero,observations[:,o])-1 for o in 1:size(observations)[2]]
         #make sure input HMMs are valid and try to mle_step them and ensure their 1-step children are valid
-        @test MS_HMMBase.assert_hmm(hmm.π0, hmm.π, hmm.D)
-        new_hmm, prob = MS_HMMBase.mle_step(hmm,observations,obs_lengths)
-        @test MS_HMMBase.assert_hmm(hmm.π0, hmm.π, hmm.D)
+        @test assert_hmm(hmm.π0, hmm.π, hmm.D)
+        new_hmm, prob = linear_step(hmm,observations,obs_lengths)
+        @test assert_hmm(hmm.π0, hmm.π, hmm.D)
         @test prob < 0
     end
 
@@ -228,7 +228,7 @@ end
     testseq=zeros(Int64,5,1)
     testseq[1:4] = [1;2;3;4]
     @test isapprox(BGHMM.get_BGHMM_symbol_lh(testseq, hmm)[1], log.(pvec[1]))
-    @test isapprox(sum(BGHMM.get_BGHMM_symbol_lh(testseq,hmm)), MS_HMMBase.obs_set_likelihood(hmm,testseq))
+    @test isapprox(sum(BGHMM.get_BGHMM_symbol_lh(testseq,hmm)), lin_obs_set_lh(hmm,testseq))
 
     pvec=[.25,.25,.25,.25]
     π = [.9 .1
@@ -236,12 +236,12 @@ end
     D = [Categorical(pvec), Categorical(pvec)]
     hmm = HMM(π, D)
 
-    @test isapprox(sum(BGHMM.get_BGHMM_symbol_lh(testseq,hmm)), MS_HMMBase.obs_set_likelihood(hmm,testseq))
+    @test isapprox(sum(BGHMM.get_BGHMM_symbol_lh(testseq,hmm)), lin_obs_set_lh(hmm,testseq))
 
     testseq=zeros(Int64,1001,1)
     testseq[1:1000,1]=rand(1:4,1000)
     
-    @test isapprox(sum(BGHMM.get_BGHMM_symbol_lh(testseq, hmm)),MS_HMMBase.obs_set_likelihood(hmm, testseq))
+    @test isapprox(sum(BGHMM.get_BGHMM_symbol_lh(testseq, hmm)),lin_obs_set_lh(hmm, testseq))
 
     Dex = [Categorical([.3, .1, .3, .3]),Categorical([.15, .35, .35, .15])]
     Dper = [Categorical([.15, .35, .35, .15]),Categorical([.4, .1, .1, .4])]
