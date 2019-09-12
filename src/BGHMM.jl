@@ -2,9 +2,10 @@
 Utility functions for learning and using background genomic hidden markov models
 """
 module BGHMM
-    using BioSequences, BioSequences.FASTA, DataFrames, GenomicFeatures, CLHMM, ProgressMeter
+    using BioSequences, BioSequences.FASTA, CLHMM, DataFrames, GenomicFeatures, ProgressMeter
     import Distributed: RemoteChannel
-    import Distributions: Dirichlet, Categorical
+    import Distributions: Univariate, Dirichlet, Categorical, logpdf
+    import HMMBase:AbstractHMM,HMM
     import ProgressMeter: AbstractProgress
     import Printf: @sprintf
     import Random: rand

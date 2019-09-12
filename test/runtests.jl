@@ -1,4 +1,4 @@
-using BGHMM,BioSequences,CLHMM,DataFrames,Distributed,Distributions,ProgressMeter,Test
+using BGHMM,BioSequences,CLHMM,DataFrames,Distributed,Distributions,HMMBase,ProgressMeter,Test
 
 include("synthetic_sequence_gen.jl")
 
