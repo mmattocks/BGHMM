@@ -72,10 +72,8 @@ while job_counter > 0
     wait(learnt_hmms)
     workerid, jobid, iterate, hmm, log_p, delta, converged = take!(learnt_hmms)
     #either update an existing ProgressHMM meter or create a new one for the job
-    if haskey(learning_meters, jobid)
-        if iterate > 2
+    if haskey(learning_meters, jobid) && iterate > 2
             BGHMM.update!(learning_meters[jobid], delta)
-        end
     else
         offset = workerid - 1
         if iterate <=2
