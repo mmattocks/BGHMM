@@ -16,7 +16,7 @@ const order_nos = [0,1,2] #DNA kmer order #s to test
 const no_models = length(Ks)*length(order_nos)*replicates
 const input_hmms= RemoteChannel(()->Channel{Tuple}(no_models*3)) #channel to hold HMM learning jobs
 const learnt_hmms= RemoteChannel(()->Channel{Tuple}(30)) #channel to take EM iterates off of
-const eps_thresh=1e-3 #stopping/convergence criterion (log probability difference btw subsequent EM iterates)
+const delta_thresh=1e-3 #stopping/convergence criterion (log probability difference btw subsequent EM iterates)
 const max_iterates=15000
 
 #DISTRIBUTED CLUSTER CONSTANTS
@@ -57,7 +57,7 @@ if isready(input_hmms) > 0
     @info "Fitting HMMs.."
     #WORKERS FIT HMMS
     for worker in worker_pool
-        remote_do(linear_hmm_converger!, worker, input_hmms, learnt_hmms, no_models, eps_thresh=eps_thresh, max_iterations=max_iterates)
+        remote_do(linear_hmm_converger!, worker, input_hmms, learnt_hmms, no_models, delta_thresh=delta_thresh, max_iterations=max_iterates)
     end
 else
     @warn "No input HMMs (all already converged?), skipping fitting.."
@@ -70,22 +70,22 @@ overall_meter=Progress(no_input_hmms,"Overall batch progress:")
 
 while job_counter > 0
     wait(learnt_hmms)
-    workerid, jobid, iterate, hmm, log_p, epsilon, converged = take!(learnt_hmms)
+    workerid, jobid, iterate, hmm, log_p, delta, converged = take!(learnt_hmms)
     #either update an existing ProgressHMM meter or create a new one for the job
     if haskey(learning_meters, jobid)
         if iterate > 2
-            BGHMM.update!(learning_meters[jobid], epsilon)
+            BGHMM.update!(learning_meters[jobid], delta)
         end
     else
         offset = workerid - 1
         if iterate <=2
-            learning_meters[jobid] = BGHMM.ProgressHMM(eps_thresh, "Jobid $jobid on worker $workerid converging:", offset, 2)
+            learning_meters[jobid] = BGHMM.ProgressHMM(delta_thresh, "Jobid $jobid on worker $workerid converging:", offset, 2)
         else
-            learning_meters[jobid] = BGHMM.ProgressHMM(eps_thresh, "Jobid $jobid on worker $workerid converging:", offset, iterate)
+            learning_meters[jobid] = BGHMM.ProgressHMM(delta_thresh, "Jobid $jobid on worker $workerid converging:", offset, iterate)
         end
     end
     #push the hmm and related params to the results_dict
-    push!(hmm_results_dict[jobid], [iterate, hmm, log_p, epsilon, converged])
+    push!(hmm_results_dict[jobid], [iterate, hmm, log_p, delta, converged])
     #decrement the job counter, update overall progress meter, and save the current results dict on convergence or max iterate
     if converged || iterate == max_iterates
         global job_counter -= 1
