@@ -15,7 +15,7 @@ const Ks = [1,2,4,6] #mosaic class #s to test
 const order_nos = [0,1,2] #DNA kmer order #s to test
 const no_models = length(Ks)*length(order_nos)*replicates
 const input_hmms= RemoteChannel(()->Channel{Tuple}(no_models*3)) #channel to hold HMM learning jobs
-const learnt_hmms= RemoteChannel(()->Channel{Tuple}()) #channel to take EM iterates off of
+const learnt_hmms= RemoteChannel(()->Channel{Tuple}(Inf)) #channel to take EM iterates off of
 const delta_thresh=1e-3 #stopping/convergence criterion (log probability difference btw subsequent EM iterates)
 const max_iterates=15000
 
