@@ -15,13 +15,13 @@ const Ks = [1,2,4,6] #mosaic class #s to test
 const order_nos = [0,1,2] #DNA kmer order #s to test
 const no_models = length(Ks)*length(order_nos)*replicates
 const input_hmms= RemoteChannel(()->Channel{Tuple}(no_models*3)) #channel to hold HMM learning jobs
-const learnt_hmms= RemoteChannel(()->Channel{Tuple}(30)) #channel to take EM iterates off of
+const learnt_hmms= RemoteChannel(()->Channel{Tuple}()) #channel to take EM iterates off of
 const delta_thresh=1e-3 #stopping/convergence criterion (log probability difference btw subsequent EM iterates)
 const max_iterates=15000
 
 #DISTRIBUTED CLUSTER CONSTANTS
 remote_machine = "10.0.0.2"
-no_local_processes = 12
+no_local_processes = 11
 no_remote_processes = 4
 #SETUP DISTRIBUTED BAUM WELCH LEARNERS
 @info "Spawning workers..."
