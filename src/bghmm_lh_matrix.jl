@@ -1,6 +1,7 @@
 #function to obtain positional likelihoods for a sequence under a given HMM.
 function get_BGHMM_symbol_lh(seq::Matrix{Int64}, hmm::HMM)
-    @assert size(seq)[2] == 1 # one sequence at a time only
+    @assert size(seq)[1] == 1
+    (seq=Array(transpose(seq))) # one sequence at a time only
     symbol_lhs = zeros(length(seq))
     length_mask = [length(seq)-1]
     

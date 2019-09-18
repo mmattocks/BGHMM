@@ -18,38 +18,8 @@ sample_record_dfs = Dict{String,DataFrame}()
 
 @testset "Order coding functions" begin
     test_seqs = [BioSequences.DNASequence("ACGTACGTACGTACGT"),BioSequences.DNASequence("TTTTTTT")]
-    target0= [1 4
-              2 4
-              3 4
-              4 4
-              1 4
-              2 4
-              3 4
-              4 0
-              1 0
-              2 0
-              3 0
-              4 0
-              1 0
-              2 0
-              3 0
-              4 0
-              0 0]
-    target2= [37 64
-              58 64
-              15 64
-              20 64
-              37 64
-              58 0
-              15 0
-              20 0
-              37 0
-              58 0
-              15 0
-              20 0
-              37 0
-              58 0
-              0 0]
+    target0= [1 2 3 4 1 2 3 4 1 2 3 4 1 2 3 4 0; 4 4 4 4 4 4 4 0 0 0 0 0 0 0 0 0 0]
+    target2= [37 58 15 20 37 58 15 20 37 58 15 20 37 58 0; 64 64 64 64 64 0 0 0 0 0 0 0 0 0 0]
     order0_seqs = BGHMM.get_order_n_seqs(test_seqs,0)
     code0_seqs = BGHMM.code_seqs(order0_seqs)
     @test target0 == code0_seqs
@@ -209,7 +179,7 @@ end
     while isready(input_hmms)
         jobid, start_iterate, hmm, last_norm, observations = take!(input_hmms)
         @test last_norm == 0
-        obs_lengths = [findfirst(iszero,observations[:,o])-1 for o in 1:size(observations)[2]]
+        obs_lengths = [findfirst(iszero,observations[o,:])-1 for o in 1:size(observations)[1]]
         #make sure input HMMs are valid and try to mle_step them and ensure their 1-step children are valid
         @test assert_hmm(hmm.π0, hmm.π, hmm.D)
         new_hmm, prob = linear_step(hmm,observations,obs_lengths)
@@ -225,8 +195,8 @@ end
     D = [Categorical(pvec)]
     hmm = HMM(π, D)
 
-    testseq=zeros(Int64,5,1)
-    testseq[1:4] = [1;2;3;4]
+    testseq=zeros(Int64,1,5)
+    testseq[1:4] = [1,2,3,4]
     @test isapprox(BGHMM.get_BGHMM_symbol_lh(testseq, hmm)[1], log.(pvec[1]))
     @test isapprox(sum(BGHMM.get_BGHMM_symbol_lh(testseq,hmm)), lin_obs_set_lh(hmm,testseq))
 
@@ -238,8 +208,8 @@ end
 
     @test isapprox(sum(BGHMM.get_BGHMM_symbol_lh(testseq,hmm)), lin_obs_set_lh(hmm,testseq))
 
-    testseq=zeros(Int64,1001,1)
-    testseq[1:1000,1]=rand(1:4,1000)
+    testseq=zeros(Int64,1,1001)
+    testseq[1,1:1000]=rand(1:4,1000)
     
     @test isapprox(sum(BGHMM.get_BGHMM_symbol_lh(testseq, hmm)),lin_obs_set_lh(hmm, testseq))
 
