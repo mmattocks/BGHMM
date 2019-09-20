@@ -10,7 +10,7 @@ using Distributed, ProgressMeter, Serialization
 #JOB CONSTANTS
 #CONSTANTS FOR BGHMM LEARNING
 const A = 4 #base alphabet size is 4 (DNA)
-const replicates = 4 #repeat optimisation from this many seperately initialised samples from the prior
+const replicates = 3 #repeat optimisation from this many seperately initialised samples from the prior
 const Ks = [1,2,4,6] #mosaic class #s to test
 const order_nos = [0,1,2] #DNA kmer order #s to test
 const no_models = length(Ks)*length(order_nos)*replicates
@@ -21,7 +21,7 @@ const max_iterates=15000
 
 #DISTRIBUTED CLUSTER CONSTANTS
 remote_machine = "10.0.0.2"
-no_local_processes = 11
+no_local_processes = 12
 no_remote_processes = 4
 #SETUP DISTRIBUTED BAUM WELCH LEARNERS
 @info "Spawning workers..."
