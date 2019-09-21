@@ -58,12 +58,15 @@ function get_order_n_seqs(seqs::Vector{DNASequence}, order_no::Int64, base_tuple
 end
 
 #convert tuple kmers to symbol codes
-function code_seqs(input::N_Order_ntSequence, offsets::Array{Int64}=[0 for i in 1:length(input.order_kmers)])
+function code_seqs(input::N_Order_ntSequence, offsets::Array{Int64}=[0 for i in 1:length(input.order_kmers)]; sorted::Bool=false)
     alphabet = input.alphabet
-    output = zeros(Int64,  length(input.order_kmers), (maximum([length(seq) for seq in input.order_kmers])+1)) #leave 1 missing value after the longest sequence for indexing sequence length in CLHMM messages
-    for (i, seq) in enumerate(input.order_kmers)
+    output = zeros(Int64,  length(input.order_kmers), (maximum([length(seq) for seq in input.order_kmers])+1)) #leave 1 missing value after the longest sequence forindexing sequence length in CLHMM messages
+    sorted && (sort_idxs = sortperm(input.seq_lengths,rev=true))
+    sorted ? input_seqs = input.order_kmers[sort_idxs] : input_seqs = input.order_kmers
+
+    for (i, seq) in enumerate(input_seqs)
         for t in 1:length(seq)
-            curr_kmer = input.order_kmers[i][t]
+            curr_kmer = seq[t]
             curr_code = alphabet.symbols[curr_kmer]
             output[i,t+offsets[i]]=curr_code
         end

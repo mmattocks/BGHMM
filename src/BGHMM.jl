@@ -60,7 +60,7 @@ module BGHMM
 
         @showprogress 1 "Encoding observations..." for order_no in order_nos, (partition_id, partition) in training_sets #build the appropriate sample sets once
             order_seqs = get_order_n_seqs(partition,order_no) #get the kmer sequences at the appropriate order
-            coded_seqs = code_seqs(order_seqs) #numerically code the sequences in trainable format
+            coded_seqs = code_seqs(order_seqs, sorted=true) #numerically code the sequences in trainable format
             code_dict[(partition_id, order_no)] = coded_seqs
         end
 
