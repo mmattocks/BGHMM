@@ -38,16 +38,16 @@ function make_padded_df(position_fasta::String, gff3_path::String, genome_path::
     return position_df
 end
 
-function add_partition_masks!(position_df::DataFrame, gff3_path::String, perigenic_pad::Int64=500)
+function add_partition_masks!(position_df::DataFrame, gff3_path::String, perigenic_pad::Int64=500, columns::Tuple{Symbol,Symbol,Symbol}=(:SeqID, :Seq, :Start))
     partitions=["exon", "periexonic", "intergenic"]
     partition_coords_dict = BGHMM.partition_genome_coordinates(gff3_path, perigenic_pad)
     partitioned_scaffolds = divide_partitions_by_scaffold(partition_coords_dict)
     maskcol = Vector{Matrix{Int64}}()
 
     @showprogress 1 "Masking..." for entry in eachrow(position_df)
-        scaffold = entry.SeqID
-        maskLength = length(entry.PadSeq)
-        seqStart = entry.PadStart
+        scaffold = entry[columns[1]]
+        maskLength = length(entry[columns[2]])
+        seqStart = entry[columns[3]]
 
         scaffold_coords_dict = Dict{String,DataFrame}()
         

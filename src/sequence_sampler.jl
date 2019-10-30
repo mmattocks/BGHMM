@@ -320,8 +320,8 @@ end
 function add_pad_to_coordinates!(feature_df::DataFrame, scaffold_df::DataFrame, pad_size::Int64; col_symbols::Array{Symbol}=[:Start, :End])
     pad_start_array = zeros(Int64,size(feature_df,1))
     pad_end_array = zeros(Int64,size(feature_df,1))
-    feature_df[col_symbols[1]] = [max(feature_df.Start[i]-pad_size,1) for i in 1:size(feature_df,1)] #truncate pads at beginning and end of scaffolds
-    feature_df[col_symbols[2]] = [min(feature_df.End[i]+pad_size,scaffold_df.End[findfirst(isequal(feature_df.SeqID[i]),scaffold_df.SeqID)]) for i in 1:size(feature_df,1)]
+    feature_df[!, col_symbols[1]] = [max(feature_df.Start[i]-pad_size,1) for i in 1:size(feature_df,1)] #truncate pads at beginning and end of scaffolds
+    feature_df[!, col_symbols[2]] = [min(feature_df.End[i]+pad_size,scaffold_df.End[findfirst(isequal(feature_df.SeqID[i]),scaffold_df.SeqID)]) for i in 1:size(feature_df,1)]
 end
 
 ####SHARED METACOORDINATE FUNCTIONS####

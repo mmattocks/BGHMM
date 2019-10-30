@@ -5,9 +5,9 @@ selected_hmm_output = "/bench/PhD/NGS_binaries/BGHMM/selected_BGHMMs"
 
 #GENERAL SETUP
 @info "Loading libraries..."
-using BGHMM, BioSequences, DataFrames, Distributions, CLHMM, ProgressMeter, Plots, Serialization, Statistics
+using BGHMM, BioSequences, DataFrames, Distributions, HMMBase, CLHMM, ProgressMeter, Serialization, Statistics #Plots
 
-const replicates = 4 #repeat optimisation from this many seperately initialised samples from the prior
+const replicates = 3 #repeat optimisation from this many seperately initialised samples from the prior
 const Ks = [1,2,4,6] #mosaic class #s to test
 const order_nos = [0,1,2] #DNA kmer order #s to test
 const partitions = ["exon", "intergenic", "periexonic"]

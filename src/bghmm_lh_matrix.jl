@@ -73,14 +73,14 @@ end
 
 
 #function to calculate BGHMM from an observation set and a dict of BGHMMs
-function BGHMM_likelihood_calc(observations::DataFrame, BGHMM_dict::Dict{String,Tuple{HMM, Int64, Float64}}, code_partition_dict = BGHMM.get_partition_code_dict(false))
-    lh_matrix_size = ((findmax(length.(collect(values(observations.PadSeq))))[1]), length(observations.PadSeq))
+function BGHMM_likelihood_calc(observations::DataFrame, BGHMM_dict::Dict{String,Tuple{HMM, Int64, Float64}}, code_partition_dict = BGHMM.get_partition_code_dict(false); symbol=:Seq)
+    lh_matrix_size = ((findmax(length.(collect(values(observations[!, symbol]))))[1]), length(observations[!, symbol]))
     BGHMM_lh_matrix = zeros(lh_matrix_size) #T, Strand, O
 
-    BGHMM_fragments = fragment_observations_by_BGHMM(observations.PadSeq, observations.MaskMatrix, observations.SeqOffset)
+    BGHMM_fragments = fragment_observations_by_BGHMM(observations[!, symbol], observations.MaskMatrix)
 
     @showprogress 1 "Writing frags to matrix.." for (jobid, frag) in BGHMM_fragments
-        (offset, frag_start, o, partition, strand) = jobid
+        (frag_start, o, partition, strand) = jobid
 
         partition_BGHMM::HMM = BGHMM_dict[code_partition_dict[partition]][1]
         no_symbols = length(partition_BGHMM.D[1].p)
@@ -94,13 +94,13 @@ function BGHMM_likelihood_calc(observations::DataFrame, BGHMM_dict::Dict{String,
         if strand == -1
             subseq_symbol_lh = reverse(subseq_symbol_lh)
         end #positive, unstranded frags  are inserted as-is
-        BGHMM_lh_matrix[offset+frag_start:offset+frag_start+length(frag)-1,o] = subseq_symbol_lh
+        BGHMM_lh_matrix[frag_start:frag_start+length(frag)-1,o] = subseq_symbol_lh
     end
 
     return BGHMM_lh_matrix
 end
 
-function fragment_observations_by_BGHMM(seqs::Vector{BioSequence{DNAAlphabet{4}}}, masks::Vector{Matrix{Int64}},offsets::Vector{Int64})
+function fragment_observations_by_BGHMM(seqs::Vector{BioSequence{DNAAlphabet{4}}}, masks::Vector{Matrix{Int64}})
     likelihood_jobs = Vector{Tuple{Tuple,BioSequence{DNAAlphabet{4}}}}()
     @showprogress 1 "Fragmenting observations by partition..." for (o, obs_seq) in enumerate(seqs)
         mask = masks[o]
@@ -115,7 +115,7 @@ function fragment_observations_by_BGHMM(seqs::Vector{BioSequence{DNAAlphabet{4}}
             curr_strand = mask[frag_start,2] #get the strand of the frag start
 
             #JOBID COMPOSED HERE
-            jobid = (offsets[o], frag_start, o, curr_partition, curr_strand) #compose an identifying index for this frag
+            jobid = (frag_start, o, curr_partition, curr_strand) #compose an identifying index for this frag
 
             findnext(!isequal(curr_partition),mask[:,1],frag_start) != nothing ? frag_end = findnext(!isequal(curr_partition),mask[:,1],frag_start) -1 : frag_end = length(obs_seq) #find the next position in the frag that has a different partition mask value from hte current one and set that position-1 to frag end, alternately frag end is end of the overall  sequence 
             frag = obs_seq[frag_start:frag_end] #get the frag bases

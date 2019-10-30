@@ -1,7 +1,7 @@
 #JOB FILEPATHS
 #sample record and hmm serialisation output path
 sample_output = "/bench/PhD/NGS_binaries/BGHMM/BGHMM_samples"
-hmm_output = "/bench/PhD/NGS_binaries/BGHMM/hmmchains"
+hmm_output = "/bench/PhD/NGS_binaries/BGHMM/tayste"
 
 #GENERAL SETUP
 @info "Loading libraries..."
@@ -21,8 +21,8 @@ const max_iterates=15000
 
 #DISTRIBUTED CLUSTER CONSTANTS
 remote_machine = "10.0.0.2"
-no_local_processes = 12
-no_remote_processes = 4
+no_local_processes = 4
+no_remote_processes = 0
 #SETUP DISTRIBUTED BAUM WELCH LEARNERS
 @info "Spawning workers..."
 addprocs(no_local_processes, topology=:master_worker)
