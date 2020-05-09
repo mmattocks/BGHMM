@@ -73,7 +73,7 @@ end
 
 
 #function to calculate BGHMM from an observation set and a dict of BGHMMs
-function BGHMM_likelihood_calc(observations::DataFrame, BGHMM_dict::Dict{String,Tuple{HMM, Int64, Float64}}, code_partition_dict = BGHMM.get_partition_code_dict(false); symbol=:Seq)
+function BGHMM_likelihood_calc(observations::DataFrame, BGHMM_dict::Dict{String,Tuple{HMM, Int64, Float64}}, code_partition_dict = BGHMM.get_partition_code_dict(false); symbol=:PadSeq)
     lh_matrix_size = ((findmax(length.(collect(values(observations[!, symbol]))))[1]), length(observations[!, symbol]))
     BGHMM_lh_matrix = zeros(lh_matrix_size) #T, Strand, O
 

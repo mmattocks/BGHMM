@@ -38,7 +38,7 @@ function make_padded_df(position_fasta::String, gff3_path::String, genome_path::
     return position_df
 end
 
-function add_partition_masks!(position_df::DataFrame, gff3_path::String, perigenic_pad::Int64=500, columns::Tuple{Symbol,Symbol,Symbol}=(:SeqID, :PadSeq, :Start))
+function add_partition_masks!(position_df::DataFrame, gff3_path::String, perigenic_pad::Int64=500, columns::Tuple{Symbol,Symbol,Symbol}=(:SeqID, :PadSeq, :PadStart))
     partitions=["exon", "periexonic", "intergenic"]
     partition_coords_dict = BGHMM.partition_genome_coordinates(gff3_path, perigenic_pad)
     partitioned_scaffolds = divide_partitions_by_scaffold(partition_coords_dict)
@@ -123,7 +123,7 @@ end
                     end
                 
                     if foundPos == false
-                        @error "Position not found among partition coordinates!"
+                        @error "Position $position not found among partition coordinates!"
                     else
                         return position_partition_id, three_prime_extent, sample_strand
                     end
