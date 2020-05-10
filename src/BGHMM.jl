@@ -109,7 +109,7 @@ module BGHMM
     #function to add additional replicates to HMMs learnt in survey for estimation of global optimum
     function HMM_global_search_setup!(hmm_results_dict::Dict, params_dict::Dict{String,Tuple{Int64,Int64}}, search_replicates::Int64, search_thresh::Float64,  input_hmms::RemoteChannel, training_sets::Dict{String,Vector{BioSequence{DNAAlphabet{4}}}}, base_alphabet_size::Int64)
         no_input_hmms=search_replicates * length(params_dict)
-        code_dict = Dict{Tuple{String}, Array{Int64}}()
+        code_dict = Dict{String, Array{Int64}}()
 
         @showprogress 1 "Encoding observations..." for (partition_id, partition) in training_sets #build the appropriate sample sets once
             K,order_no=params_dict[partition_id]
