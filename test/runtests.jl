@@ -174,7 +174,7 @@ end
     training_sets, test_sets = BGHMM.split_obs_sets(sample_record_dfs)
 
     hmm_results_dict = Dict()
-    no_input_hmms = BGHMM.HMM_setup!(order_nos, Ks, replicates, hmm_results_dict, input_hmms, training_sets, A)
+    no_input_hmms = BGHMM.HMM_survey_setup!(order_nos, Ks, replicates, hmm_results_dict, input_hmms, training_sets, A)
 
     while isready(input_hmms)
         jobid, start_iterate, hmm, last_norm, observations = take!(input_hmms)
