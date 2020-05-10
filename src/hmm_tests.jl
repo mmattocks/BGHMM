@@ -77,7 +77,7 @@ function chain_3devo_coords(chains::Vector{Vector{Any}})
             end
             min_euc_idx = findmin(euclideans)[2]
             while min_euc_idx in ref_idxs
-                deleteat!(euclideans, min_euc_idx)
+                euclideans[min_euc_idx]=1.
                 min_euc_idx = findmin(euclideans)[2]
             end
             push!(ref_idxs,findmin(euclideans)[2])
