@@ -40,7 +40,6 @@ end
 
 #from a vector of DNASequences, get
 function get_order_n_seqs(seqs::Vector{DNASequence}, order_no::Integer, base_tuple::Tuple=ACGT)
-    length(base_tuple)^order_no+1 > typemax(UInt8) && throw(ArgumentError("base_tuple length ^ order_no+1 must be <255 for UInt8 coding"))
     kmer_vecs = Vector{Vector{Kmer}}()
     length_vec = Vector{Integer}()
     window = order_no + 1
@@ -60,8 +59,16 @@ end
 
 #convert tuple kmers to symbol codes
 function code_seqs(input::N_Order_ntSequence, offsets::Array{Integer}=[0 for i in 1:length(input.order_kmers)]; sorted::Bool=false)
+    symbol_no=length(input.alphabet)
+    if symbol_no <= typemax(UInt8)
+        integer_type = UInt8
+    elseif typemax(UInt8) < symbol_no < typemax(UInt16)
+        integer_type = UInt16
+    else
+        integer_type = UInt32
+
     alphabet = input.alphabet
-    output = zeros(UInt8,  length(input.order_kmers), (maximum([length(seq) for seq in input.order_kmers])+1)) #leave 1 missing value after the longest sequence forindexing sequence length in CLHMM messages
+    output = zeros(integer_type,  length(input.order_kmers), (maximum([length(seq) for seq in input.order_kmers])+1)) #leave 1 missing value after the longest sequence forindexing sequence length in CLHMM messages
     sorted && (sort_idxs = sortperm(input.seq_lengths,rev=true))
     sorted ? input_seqs = input.order_kmers[sort_idxs] : input_seqs = input.order_kmers
 
