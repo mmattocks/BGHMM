@@ -1,5 +1,5 @@
 #function to obtain positional likelihoods for a sequence under a given HMM.
-function get_BGHMM_symbol_lh(seq::Matrix{Int64}, hmm::HMM)
+function get_BGHMM_symbol_lh(seq::Matrix{Integer}, hmm::HMM)
     @assert size(seq)[1] == 1
     (seq=Array(transpose(seq))) # one sequence at a time only
     symbol_lhs = zeros(length(seq))
@@ -25,9 +25,9 @@ function get_BGHMM_symbol_lh(seq::Matrix{Int64}, hmm::HMM)
     end
 
     for t in 1:length_mask[1]
-        symbol_lh::Float64 = -Inf #ie log(p=0)
+        symbol_lh::AbstractFloat = -Inf #ie log(p=0)
         for k = 1:K #iterate over states
-                state_symbol_lh::Float64 = CLHMM.lps(log_γ[t,k], log(hmm.D[k].p[seq[t]])) #state symbol likelihood is the γ weight * the state symbol probability (log implementation)
+                state_symbol_lh::AbstractFloat = CLHMM.lps(log_γ[t,k], log(hmm.D[k].p[seq[t]])) #state symbol likelihood is the γ weight * the state symbol probability (log implementation)
                 symbol_lh = logaddexp(symbol_lh, state_symbol_lh) #sum the probabilities over states
         end
         symbol_lhs[t] = symbol_lh
@@ -36,7 +36,7 @@ function get_BGHMM_symbol_lh(seq::Matrix{Int64}, hmm::HMM)
     return symbol_lhs[1:end-1] #remove trailing index position
 end
                 #multisequence competent lls fn
-                function log_likelihoods(hmm::AbstractHMM{Univariate}, observations::Matrix{Int64})
+                function log_likelihoods(hmm::AbstractHMM{Univariate}, observations::Matrix{Integer})
                     lls = zeros(length(hmm.D), size(observations)...)
                     Threads.@threads for d in 1:length(hmm.D)
                         lls[d,:,:] = logpdf.(hmm.D[d], observations)
@@ -45,7 +45,7 @@ end
                 end
 
                 #Multisequence competent log implementations of forward and backwards algos
-                function messages_forwards_log(init_distn::AbstractVector{Float64}, trans_matrix::AbstractMatrix{Float64}, log_likelihoods::Array{Float64,3}, obs_lengths::Vector{Int64})
+                function messages_forwards_log(init_distn::AbstractVector{AbstractFloat}, trans_matrix::AbstractMatrix{AbstractFloat}, log_likelihoods::Array{AbstractFloat,3}, obs_lengths::Vector{Integer})
                     log_alphas = zeros(size(log_likelihoods))
                     log_trans_matrix = log.(trans_matrix)
                     log_alphas[:,1,:] = log.(init_distn) .+ log_likelihoods[:,1,:]
@@ -57,7 +57,7 @@ end
                     return log_alphas
                 end
 
-                function messages_backwards_log(trans_matrix::AbstractMatrix{Float64}, log_likelihoods::Array{Float64,3}, obs_lengths::Vector{Int64})
+                function messages_backwards_log(trans_matrix::AbstractMatrix{AbstractFloat}, log_likelihoods::Array{AbstractFloat,3}, obs_lengths::Vector{Integer})
                     log_betas = zeros(size(log_likelihoods))
                     log_trans_matrix = log.(trans_matrix)
                     Threads.@threads for o in 1:size(log_likelihoods)[3]
@@ -73,7 +73,7 @@ end
 
 
 #function to calculate BGHMM from an observation set and a dict of BGHMMs
-function BGHMM_likelihood_calc(observations::DataFrame, BGHMM_dict::Dict{String,Tuple{HMM, Int64, Float64}}, code_partition_dict = BGHMM.get_partition_code_dict(false); symbol=:PadSeq)
+function BGHMM_likelihood_calc(observations::DataFrame, BGHMM_dict::Dict{String,Tuple{HMM, Integer, AbstractFloat}}, code_partition_dict = BGHMM.get_partition_code_dict(false); symbol=:PadSeq)
     lh_matrix_size = ((findmax(length.(collect(values(observations[!, symbol]))))[1]), length(observations[!, symbol]))
     BGHMM_lh_matrix = zeros(lh_matrix_size) #T, Strand, O
 
@@ -100,7 +100,7 @@ function BGHMM_likelihood_calc(observations::DataFrame, BGHMM_dict::Dict{String,
     return BGHMM_lh_matrix
 end
 
-function fragment_observations_by_BGHMM(seqs::Vector{BioSequence{DNAAlphabet{4}}}, masks::Vector{Matrix{Int64}})
+function fragment_observations_by_BGHMM(seqs::Vector{BioSequence{DNAAlphabet{4}}}, masks::Vector{Matrix{Integer}})
     likelihood_jobs = Vector{Tuple{Tuple,BioSequence{DNAAlphabet{4}}}}()
     @showprogress 1 "Fragmenting observations by partition..." for (o, obs_seq) in enumerate(seqs)
         mask = masks[o]

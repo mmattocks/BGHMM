@@ -1,18 +1,18 @@
 #KMER ORDER/SEQUENCE INTEGER CODING UTILITIES
 #higher order DNA alphabet
 struct CompoundAlphabet
-  symbols::Dict{Kmer,Int64}
+  symbols::Dict{Kmer,Integer}
 end
 
 #holds a DNA sequence, a higher-order index/kmer sequence, the alphabet used to produce the Kmers, and the order number
 struct N_Order_ntSequence
   alphabet::CompoundAlphabet
-  seq_lengths::Vector{Int64}
+  seq_lengths::Vector{Integer}
   order_kmers::Vector{Vector{Kmer}}
 end
 
 #build a CompoundAlphabet for DNA of some order_no
-function compound_DNA_alphabet(alphabet::Tuple, order_no::Int64)
+function compound_DNA_alphabet(alphabet::Tuple, order_no::Integer)
   symbols = Array{Kmer}(undef, length(alphabet)^(order_no+1))
   tuples = Array{Tuple}
   if order_no > 0
@@ -30,7 +30,7 @@ function compound_DNA_alphabet(alphabet::Tuple, order_no::Int64)
       symbols[index] = tuple_seq
   end
 
-  code_dict=Dict{Kmer,Int64}()
+  code_dict=Dict{Kmer,Integer}()
   @inbounds for i in 1:length(symbols)
       code_dict[symbols[i]]=i
   end
@@ -39,9 +39,10 @@ function compound_DNA_alphabet(alphabet::Tuple, order_no::Int64)
 end
 
 #from a vector of DNASequences, get
-function get_order_n_seqs(seqs::Vector{DNASequence}, order_no::Int64, base_tuple::Tuple=ACGT)
+function get_order_n_seqs(seqs::Vector{DNASequence}, order_no::Integer, base_tuple::Tuple=ACGT)
+    length(base_tuple)^order_no+1 > typemax(UInt8) && throw(ArgumentError("base_tuple length ^ order_no+1 must be <255 for UInt8 coding"))
     kmer_vecs = Vector{Vector{Kmer}}()
-    length_vec = Vector{Int64}()
+    length_vec = Vector{Integer}()
     window = order_no + 1
 
     for seq in seqs
@@ -58,9 +59,9 @@ function get_order_n_seqs(seqs::Vector{DNASequence}, order_no::Int64, base_tuple
 end
 
 #convert tuple kmers to symbol codes
-function code_seqs(input::N_Order_ntSequence, offsets::Array{Int64}=[0 for i in 1:length(input.order_kmers)]; sorted::Bool=false)
+function code_seqs(input::N_Order_ntSequence, offsets::Array{Integer}=[0 for i in 1:length(input.order_kmers)]; sorted::Bool=false)
     alphabet = input.alphabet
-    output = zeros(Int64,  length(input.order_kmers), (maximum([length(seq) for seq in input.order_kmers])+1)) #leave 1 missing value after the longest sequence forindexing sequence length in CLHMM messages
+    output = zeros(UInt8,  length(input.order_kmers), (maximum([length(seq) for seq in input.order_kmers])+1)) #leave 1 missing value after the longest sequence forindexing sequence length in CLHMM messages
     sorted && (sort_idxs = sortperm(input.seq_lengths,rev=true))
     sorted ? input_seqs = input.order_kmers[sort_idxs] : input_seqs = input.order_kmers
 

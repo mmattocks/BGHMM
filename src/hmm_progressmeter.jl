@@ -1,25 +1,25 @@
 #UTILITY PROGRESSMETER, REPORTS WORKER NUMBER AND CURRENT ITERATE
 mutable struct ProgressHMM{T<:Real} <: AbstractProgress
     thresh::T
-    dt::Float64
+    dt::AbstractFloat
     val::T
-    counter::Int
+    counter::Integer
     triggered::Bool
-    tfirst::Float64
-    tlast::Float64
+    tfirst::AbstractFloat
+    tlast::AbstractFloat
     printed::Bool        # true if we have issued at least one status update
     desc::AbstractString # prefix to the percentage, e.g.  "Computing..."
     color::Symbol        # default to green
     output::IO           # output stream into which the progress is written
-    numprintedvalues::Int   # num values printed below progress in last iteration
-    offset::Int             # position offset of progress bar (default is 0)
+    numprintedvalues::Integer   # num values printed below progress in last iteration
+    offset::Integer             # position offset of progress bar (default is 0)
     function ProgressHMM{T}(thresh;
                                dt::Real=0.1,
                                desc::AbstractString="Progress: ",
                                color::Symbol=:green,
                                output::IO=stderr,
-                               offset::Int=0,
-                               start_it::Int=1) where T
+                               offset::Integer=0,
+                               start_it::Integer=1) where T
         tfirst = tlast = time()
         printed = false
         new{T}(thresh, dt, typemax(T), start_it, false, tfirst, tlast, printed, desc, color, output, 0, offset)

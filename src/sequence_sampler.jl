@@ -1,6 +1,6 @@
 ####SAMPLING FUNCTIONS####
 #function to partition genome and set up Distributed RemoteChannels so partitions can be sampled simultaneously
-function setup_sample_jobs(genome_path::String, genome_index_path::String, gff3_path::String, sample_set_length::Int64, sample_window_min::Int64, sample_window_max::Int64, perigenic_pad::Int64; deterministic::Bool=false)
+function setup_sample_jobs(genome_path::String, genome_index_path::String, gff3_path::String, sample_set_length::Integer, sample_window_min::Integer, sample_window_max::Integer, perigenic_pad::Integer; deterministic::Bool=false)
     coordinate_partitions = partition_genome_coordinates(gff3_path, perigenic_pad)
     sample_sets = DataFrame[]
     input_sample_jobs = RemoteChannel(()->Channel{Tuple}(length(coordinate_partitions))) #channel to hold sampling jobs
@@ -17,17 +17,17 @@ end
 #"periexonic" sequences (genes with 5' and 3' boundaries projected -/+perigenic_pad bp, minus exons) - includes promoter elements, introns, 3' elements
 #intergenic sequences (everything else)
 #given a valid gff3
-function partition_genome_coordinates(gff3_path::String, perigenic_pad::Int64=500)
+function partition_genome_coordinates(gff3_path::String, perigenic_pad::Integer=500)
     # construct dataframes of scaffolds and metacoordinates
     scaffold_df = build_scaffold_df(gff3_path)
 
     #partition genome into intragenic, periexonic, and exonic coordinate sets
     #assemble exonic featureset
-    exon_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[], Strand=Char[])
+    exon_df = DataFrame(SeqID = String[], Start = Integer[], End = Integer[], Strand=Char[])
     build_feature_df!(gff3_path, "CDS", "MT", exon_df)
 
     #project exon coordinates onto the scaffold bitwise, merging overlapping features and returning the merged dataframe
-    merged_exon_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[], Strand=Char[])
+    merged_exon_df = DataFrame(SeqID = String[], Start = Integer[], End = Integer[], Strand=Char[])
     @showprogress 1 "Partitioning exons..." for scaffold_subframe in DataFrames.groupby(exon_df, :SeqID) # for each scaffold subframe that has exon features
         scaffold_id  = scaffold_subframe.SeqID[1] #get the scaffold id
         scaffold_bitarray = init_scaffold_bitarray(scaffold_id, scaffold_df, false, stranded=true) #init a stranded bitarray of scaffold length
@@ -37,13 +37,13 @@ function partition_genome_coordinates(gff3_path::String, perigenic_pad::Int64=50
     end
 
     #assemble gene featureset
-    gene_df =  DataFrame(SeqID = String[], Start = Int64[], End = Int64[], Strand = Char[])
+    gene_df =  DataFrame(SeqID = String[], Start = Integer[], End = Integer[], Strand = Char[])
     build_feature_df!(gff3_path, "gene", "MT", gene_df)
 
     perigenic_pad > 0 && add_pad_to_coordinates!(gene_df, scaffold_df, perigenic_pad) #if a perigenic pad is specified (to capture promoter/downstream elements etc in the periexonic set), apply it to the gene coords
 
     #build intergenic coordinate set by subtracting gene features from scaffold bitarrays
-    intergenic_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[])
+    intergenic_df = DataFrame(SeqID = String[], Start = Integer[], End = Integer[])
     @showprogress 1 "Partitioning intergenic regions..." for scaffold_subframe in DataFrames.groupby(scaffold_df, :SeqID) # for each scaffold subframe that has exon features
         scaffold_id  = scaffold_subframe.SeqID[1] #get the scaffold id
         scaffold_bitarray = init_scaffold_bitarray(scaffold_id, scaffold_df, true) #init a bitarray of scaffold length
@@ -56,7 +56,7 @@ function partition_genome_coordinates(gff3_path::String, perigenic_pad::Int64=50
     end
 
     #build periexonic set by projecting gene coordinates onto the scaffold bitwise, then subtracting the exons
-    periexonic_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[], Strand=Char[])
+    periexonic_df = DataFrame(SeqID = String[], Start = Integer[], End = Integer[], Strand=Char[])
     @showprogress 1 "Partitioning periexonic regions..." for gene_subframe in DataFrames.groupby(gene_df, :SeqID) # for each scaffold subframe that has exon features
         scaffold_id  = gene_subframe.SeqID[1] #get the scaffold id
         scaffold_bitarray = init_scaffold_bitarray(scaffold_id, scaffold_df, false, stranded=true) #init a bitarray of scaffold length
@@ -101,7 +101,7 @@ end
             end
 
             function get_feature_df_from_bitarray(scaffold_id::String, scaffold_bitarray::BitArray)
-                size(scaffold_bitarray)[2] == 2 ? scaffold_feature_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[], Strand=Char[]) : scaffold_feature_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[])
+                size(scaffold_bitarray)[2] == 2 ? scaffold_feature_df = DataFrame(SeqID = String[], Start = Integer[], End = Integer[], Strand=Char[]) : scaffold_feature_df = DataFrame(SeqID = String[], Start = Integer[], End = Integer[])
 
                 new_feature_start = findnext(view(scaffold_bitarray,:,1), 1)
                 while new_feature_start != nothing # while new features are still found on the bitarray
@@ -127,12 +127,12 @@ function get_sample_set(input_sample_jobs::RemoteChannel, completed_sample_jobs:
         stranded::Bool = get_strand_dict()[partitionid]
         scaffold_sequence_record_dict::Dict{String,DNASequence} = build_scaffold_seq_dict(genome_path, genome_index_path)
 
-        sample_df = DataFrame(SampleScaffold=String[],SampleStart=Int64[],SampleEnd=Int64[],SampleSequence=DNASequence[],Strand=Char[])
+        sample_df = DataFrame(SampleScaffold=String[],SampleStart=Integer[],SampleEnd=Integer[],SampleSequence=DNASequence[],Strand=Char[])
         metacoordinate_bitarray = trues(partition_df.MetaEnd[end])
         sample_set_counter = 0
 
         while sample_set_counter < sample_set_length #while we don't yet have enough sample sequence
-            sample_scaffold::String, sample_Start::Int64, sample_End::Int64, sample_metaStart::Int64, sample_metaEnd::Int64, sample_sequence::DNASequence, strand::Char = get_sample(metacoordinate_bitarray, sample_window_min, sample_window_max,  partition_df, scaffold_sequence_record_dict, partitionid; stranded=stranded, deterministic=deterministic)
+            sample_scaffold::String, sample_Start::Integer, sample_End::Integer, sample_metaStart::Integer, sample_metaEnd::Integer, sample_sequence::DNASequence, strand::Char = get_sample(metacoordinate_bitarray, sample_window_min, sample_window_max,  partition_df, scaffold_sequence_record_dict, partitionid; stranded=stranded, deterministic=deterministic)
             push!(sample_df,[sample_scaffold, sample_Start, sample_End, sample_sequence, strand]) #push the sample to the df
             sample_length = sample_End - sample_Start + 1
             sample_set_counter += sample_length #increase the counter by the length of the sampled sequence
@@ -171,7 +171,7 @@ end
                 end
 
                 #function to produce a single sample from a metacoordinate set and the feature df
-                function get_sample(metacoordinate_bitarray::BitArray, sample_window_min::Int64, sample_window_max::Int64, partition_df::DataFrame,  scaffold_seq_dict::Dict{String,DNASequence}, partitionid::String; stranded::Bool=false, deterministic::Bool=false)
+                function get_sample(metacoordinate_bitarray::BitArray, sample_window_min::Integer, sample_window_max::Integer, partition_df::DataFrame,  scaffold_seq_dict::Dict{String,DNASequence}, partitionid::String; stranded::Bool=false, deterministic::Bool=false)
                     proposal_acceptance = false
                     sample_metaStart = 0
                     sample_metaEnd = 0
@@ -216,7 +216,7 @@ end
                 end
                 
                 #function to find a valid sampling window
-                function determine_sample_window(feature_metaStart::Int64, feature_metaEnd::Int64, metacoord::Int64, metacoord_bitarray::BitArray, sample_window_min::Int64, sample_window_max::Int64)
+                function determine_sample_window(feature_metaStart::Integer, feature_metaEnd::Integer, metacoord::Integer, metacoord_bitarray::BitArray, sample_window_min::Integer, sample_window_max::Integer)
                     window_start = 0
                     window_end = 0
                     feature_size = feature_metaEnd - feature_metaStart + 1
@@ -268,7 +268,7 @@ end
 
 ####SHARED SEQUENCE FETCHER####
 # function to get proposal sequence from dict of scaffold sequences, given coords and scaffold id
-function fetch_sequence(scaffold_id::String, scaffold_seq_dict::Dict{String, DNASequence}, proposal_start::Int64, proposal_end::Int64, strand::Char; deterministic=false)
+function fetch_sequence(scaffold_id::String, scaffold_seq_dict::Dict{String, DNASequence}, proposal_start::Integer, proposal_end::Integer, strand::Char; deterministic=false)
     if strand == '0' #unstranded samples may be returned with no preference in either orientation
         deterministic ? strand = '+' : (rand(1)[1] <=.5 ? strand = '+' : strand = '-')
     end
@@ -309,7 +309,7 @@ end
 
 #function to assemble dataframe of scaffold coords + metacoords given gff3
 function build_scaffold_df(gff3_path)
-    scaffold_df = DataFrame(SeqID = String[], Start = Int64[], End = Int64[])
+    scaffold_df = DataFrame(SeqID = String[], Start = Integer[], End = Integer[])
     build_feature_df!(gff3_path, "supercontig", "MT", scaffold_df)
     build_feature_df!(gff3_path, "chromosome", "MT", scaffold_df)
     add_metacoordinates!(scaffold_df)
@@ -317,9 +317,9 @@ function build_scaffold_df(gff3_path)
 end
 
 #function to add pad to either side of some featureset
-function add_pad_to_coordinates!(feature_df::DataFrame, scaffold_df::DataFrame, pad_size::Int64; col_symbols::Array{Symbol}=[:Start, :End])
-    pad_start_array = zeros(Int64,size(feature_df,1))
-    pad_end_array = zeros(Int64,size(feature_df,1))
+function add_pad_to_coordinates!(feature_df::DataFrame, scaffold_df::DataFrame, pad_size::Integer; col_symbols::Array{Symbol}=[:Start, :End])
+    pad_start_array = zeros(Integer,size(feature_df,1))
+    pad_end_array = zeros(Integer,size(feature_df,1))
     feature_df[!, col_symbols[1]] = [max(feature_df.Start[i]-pad_size,1) for i in 1:size(feature_df,1)] #truncate pads at beginning and end of scaffolds
     feature_df[!, col_symbols[2]] = [min(feature_df.End[i]+pad_size,scaffold_df.End[findfirst(isequal(feature_df.SeqID[i]),scaffold_df.SeqID)]) for i in 1:size(feature_df,1)]
 end
@@ -327,8 +327,8 @@ end
 ####SHARED METACOORDINATE FUNCTIONS####
 # function to add a metacoordinate column to a dataframe of scaffold positions, allowing sampling across all scaffolds
 function add_metacoordinates!(feature_df::DataFrame)
-    meta_start_array = Int64[]
-    meta_end_array = Int64[]
+    meta_start_array = Integer[]
+    meta_end_array = Integer[]
     metaposition = 1
     @inbounds for feature in eachrow(feature_df)
         push!(meta_start_array, (metaposition))
@@ -341,7 +341,7 @@ function add_metacoordinates!(feature_df::DataFrame)
 end
 
 # function to convert metacoordinate set to scaffold-relative coordinates
-function meta_to_feature_coord(meta_start::Int64, meta_end::Int64, feature_df::DataFrame)
+function meta_to_feature_coord(meta_start::Integer, meta_end::Integer, feature_df::DataFrame)
     feature_row = get_feature_row_index(feature_df, meta_start)
     seqid = feature_df.SeqID[feature_row]
     scaffold_start = feature_df.Start[feature_row] + (meta_start - feature_df.MetaStart[feature_row])
@@ -350,7 +350,7 @@ function meta_to_feature_coord(meta_start::Int64, meta_end::Int64, feature_df::D
 end
 
 #function to obtain the feature boundaries and strand of the feature that a metacoordinate falls within
-function get_feature_params_from_metacoord(metacoordinate::Int64, feature_df::DataFrame, stranded::Bool)
+function get_feature_params_from_metacoord(metacoordinate::Integer, feature_df::DataFrame, stranded::Bool)
     feature_row = get_feature_row_index(feature_df, metacoordinate)
     feature_metaStart = feature_df.MetaStart[feature_row]
     feature_metaEnd = feature_df.MetaEnd[feature_row]
@@ -359,7 +359,7 @@ function get_feature_params_from_metacoord(metacoordinate::Int64, feature_df::Da
 end
 
 #function obtain the index of a feature given its metacoordinate
-function get_feature_row_index(feature_df::DataFrame, metacoordinate::Int64)
+function get_feature_row_index(feature_df::DataFrame, metacoordinate::Integer)
     total_feature_bases = feature_df.MetaEnd[end]
     if metacoordinate == total_feature_bases #edge case of metacoord at end of range
         return size(feature_df,1) #last index in df

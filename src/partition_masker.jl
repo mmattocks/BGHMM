@@ -6,11 +6,11 @@ function get_partition_code_dict(dict_forward::Bool=true)
     end
 end
 
-function make_padded_df(position_fasta::String, gff3_path::String, genome_path::String, genome_index_path::String, pad::Int64)
+function make_padded_df(position_fasta::String, gff3_path::String, genome_path::String, genome_index_path::String, pad::Integer)
     position_reader = BioSequences.FASTA.Reader(open((position_fasta),"r"))
     genome_reader = open(BioSequences.FASTA.Reader, genome_path, index=genome_index_path)
     scaffold_df = BGHMM.build_scaffold_df(gff3_path)
-    position_df = DataFrame(SeqID = String[], Start=Int64[], End=Int64[], PadSeq = DNASequence[], PadStart=Int64[], RelStart=Int64[], SeqOffset=Int64[])
+    position_df = DataFrame(SeqID = String[], Start=Integer[], End=Integer[], PadSeq = DNASequence[], PadStart=Integer[], RelStart=Integer[], SeqOffset=Integer[])
     scaffold_seq_dict = BGHMM.build_scaffold_seq_dict(genome_path, genome_index_path)
 
     for entry in position_reader
@@ -18,8 +18,8 @@ function make_padded_df(position_fasta::String, gff3_path::String, genome_path::
 
         if scaffold != "MT"
             desc_array = split(BioSequences.FASTA.description(entry))
-            pos_start = parse(Int64, desc_array[2])
-            pos_end = parse(Int64, desc_array[4])
+            pos_start = parse(Integer, desc_array[2])
+            pos_end = parse(Integer, desc_array[4])
             scaffold_end = scaffold_df.End[findfirst(isequal(scaffold), scaffold_df.SeqID)]
 
             pad_start=max(1,pos_start-pad)
@@ -38,11 +38,11 @@ function make_padded_df(position_fasta::String, gff3_path::String, genome_path::
     return position_df
 end
 
-function add_partition_masks!(position_df::DataFrame, gff3_path::String, perigenic_pad::Int64=500, columns::Tuple{Symbol,Symbol,Symbol}=(:SeqID, :PadSeq, :PadStart))
+function add_partition_masks!(position_df::DataFrame, gff3_path::String, perigenic_pad::Integer=500, columns::Tuple{Symbol,Symbol,Symbol}=(:SeqID, :PadSeq, :PadStart))
     partitions=["exon", "periexonic", "intergenic"]
     partition_coords_dict = BGHMM.partition_genome_coordinates(gff3_path, perigenic_pad)
     partitioned_scaffolds = divide_partitions_by_scaffold(partition_coords_dict)
-    maskcol = Vector{Matrix{Int64}}()
+    maskcol = Vector{Matrix{Integer}}()
 
     @showprogress 1 "Masking..." for entry in eachrow(position_df)
         scaffold = entry[columns[1]]
@@ -75,9 +75,9 @@ end
                     return scaffold_coords_dict
                 end
 
-                function mask_sequence_by_partition(maskLength::Int64, seqStart::Int64, scaffold_coords_dict::Dict{String, DataFrame})
+                function mask_sequence_by_partition(maskLength::Integer, seqStart::Integer, scaffold_coords_dict::Dict{String, DataFrame})
                     partition_code_dict = get_partition_code_dict()
-                    seqMask = zeros(Int64, (maskLength, 2))
+                    seqMask = zeros(Integer, (maskLength, 2))
                     position = seqStart
                     while position <= seqStart+maskLength
                         position_partition, partition_extent, position_strand = find_position_partition(position, scaffold_coords_dict)
@@ -103,7 +103,7 @@ end
                     end
                 end
 
-                function find_position_partition(position::Int64, partition_dict::Dict{String, DataFrame})
+                function find_position_partition(position::Integer, partition_dict::Dict{String, DataFrame})
                     foundPos = false
                     position_partition_id = ""
                     three_prime_extent = 0

@@ -28,13 +28,13 @@ function chain_diagonal_stability_matrix(chain::Vector{Any})
 end
 
 #function to simulate run lengths for vector of diagonal values
-function sim_run_lengths(diagonal_value::Array{Float64}, samples::Int64)
+function sim_run_lengths(diagonal_value::Array{AbstractFloat}, samples::Integer)
     if isnan(diagonal_value[1])
         return [NaN]
     else
         mean_run_lengths = zeros(length(diagonal_value))
         for (i, value) in enumerate(diagonal_value)
-            runlengths = zeros(Int64, samples)
+            runlengths = zeros(Integer, samples)
             for s in 1:samples
                 run = true
                 runlength = 0
@@ -56,7 +56,7 @@ end
 
 function chain_3devo_coords(chains::Vector{Vector{Any}})
     length(chains)<=0 && throw(ArgumentError, "Argument must be vector of more than one hmm chain")
-    coords=[Vector{Tuple{Float64,Float64,Float64}}() for i in 1:length(chains)]
+    coords=[Vector{Tuple{AbstractFloat,AbstractFloat,AbstractFloat}}() for i in 1:length(chains)]
 
     for step in chains[1]
         hmm=step[2]
@@ -65,13 +65,13 @@ function chain_3devo_coords(chains::Vector{Vector{Any}})
     end
 
     for (c, chain) in enumerate(chains[2:end])
-        ref_idxs=Vector{Int64}()
+        ref_idxs=Vector{Integer}()
         ref_vecs=[chains[1][end][2].D[1].p,chains[1][end][2].D[2].p,chains[1][end][2].D[3].p]
         end_hmm=chain[end][2]
         length(end_hmm.D)<3 && throw(ArgumentError, "3- or greater state hmms required")
 
         for vec in ref_vecs
-            euclideans=Vector{Float64}()
+            euclideans=Vector{AbstractFloat}()
             for d in 1:length(end_hmm.D)
                 push!(euclideans, euclidean(vec, end_hmm.D[d].p))
             end

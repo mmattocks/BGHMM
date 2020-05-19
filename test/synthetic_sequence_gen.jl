@@ -1,4 +1,4 @@
-function print_synthetic_fasta(path::String,line_length::Int64=80)
+function print_synthetic_fasta(path::String,line_length::Integer=80)
 	header=">CM002885.2.1 BGHMM Synthetic chromosome for tests\n"
 	write(path, header, format_lines(generate_synthetic_seq(),line_length))
 end
@@ -39,7 +39,7 @@ gff_txt = "##gff-version 3
 	write(path,gff_txt)
 end
 
-function generate_synthetic_seq(gene_start::Int64=501, UTR3L::Int64=10, exon_length::Int64=60, intron_length::Int64=40, no_exons::Int64=5, UTR5L::Int64=25, OAL::Int64=1000, (iseq,pseq,eseq)::Tuple{String,String,String}=("AT","CG","CAT"); verbose::Bool=false)
+function generate_synthetic_seq(gene_start::Integer=501, UTR3L::Integer=10, exon_length::Integer=60, intron_length::Integer=40, no_exons::Integer=5, UTR5L::Integer=25, OAL::Integer=1000, (iseq,pseq,eseq)::Tuple{String,String,String}=("AT","CG","CAT"); verbose::Bool=false)
 	@assert length(iseq) == 2
 	@assert length(pseq) == 2
 	@assert length(eseq) == 3
@@ -84,7 +84,7 @@ function generate_synthetic_seq(gene_start::Int64=501, UTR3L::Int64=10, exon_len
 	return seq
 end
 
-  function format_lines(seq::String, line_length::Int64)
+  function format_lines(seq::String, line_length::Integer)
 	a=join((SubString(seq,i,min(i+line_length-1,length(seq))) for i=1:line_length:length(seq)),'\n')
 	return(a)
   end

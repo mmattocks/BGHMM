@@ -38,7 +38,7 @@ module BGHMM
     end
 
     #function to construct HMM transition matrix with strong priors on auto-transition
-    function generate_transition_matrix(states::Int64, prior_dope::Float64=(states*250.0), prior_background::Float64=.1)
+    function generate_transition_matrix(states::Integer, prior_dope::AbstractFloat=(states*250.0), prior_background::AbstractFloat=.1)
         transition_matrix=zeros(states,states)
         for k in 1:states
             dirichlet_params = fill(prior_background, states)
@@ -55,9 +55,9 @@ module BGHMM
 
     #function to setup an HMM results dictionary and RemoteChannel for learning jobs, given a vector of state #s, order_nos, replicates to train, the dictionary to fill, the RemoteChannel and the training sequences
     #resumes any existing non-converged chains, otherwise initialises hmms for new chains given provided constants
-    function HMM_survey_setup!(order_nos::Array{Int64}, Ks::Array{Int64}, replicates::Int64, hmm_results_dict::Dict, input_hmms::RemoteChannel, training_sets::Dict{String,Vector{BioSequence{DNAAlphabet{4}}}}, base_alphabet_size::Int64)
+    function HMM_survey_setup!(order_nos::Array{Integer}, Ks::Array{Integer}, replicates::Integer, hmm_results_dict::Dict, input_hmms::RemoteChannel, training_sets::Dict{String,Vector{BioSequence{DNAAlphabet{4}}}}, base_alphabet_size::Integer)
         no_input_hmms = length(Ks)*length(order_nos)*replicates*length(training_sets)
-        code_dict = Dict{Tuple{String,Int64}, Array{Int64}}()
+        code_dict = Dict{Tuple{String,Integer}, Array{Integer}}()
 
         @showprogress 1 "Encoding observations..." for order_no in order_nos, (partition_id, partition) in training_sets #build the appropriate sample sets once
             order_seqs = get_order_n_seqs(partition,order_no) #get the kmer sequences at the appropriate order
@@ -95,7 +95,7 @@ module BGHMM
 
     #function to determine required jobids for global search from hmms learnt in survey
     function HMM_global_search_params(hmm_results_dict::Dict)
-        params_dict=Dict{String,Tuple{Int64,Int64}}()
+        params_dict=Dict{String,Tuple{Integer,Integer}}()
         for ((partition, K, order, rep), chain) in hmm_results_dict
             if !haskey(params_dict, partition)
                 params_dict[partition]=(K, order)
@@ -107,9 +107,9 @@ module BGHMM
     end
 
     #function to add additional replicates to HMMs learnt in survey for estimation of global optimum
-    function HMM_global_search_setup!(hmm_results_dict::Dict, params_dict::Dict{String,Tuple{Int64,Int64}}, search_replicates::Int64, search_thresh::Float64,  input_hmms::RemoteChannel, training_sets::Dict{String,Vector{BioSequence{DNAAlphabet{4}}}}, base_alphabet_size::Int64)
+    function HMM_global_search_setup!(hmm_results_dict::Dict, params_dict::Dict{String,Tuple{Integer,Integer}}, search_replicates::Integer, search_thresh::AbstractFloat,  input_hmms::RemoteChannel, training_sets::Dict{String,Vector{BioSequence{DNAAlphabet{4}}}}, base_alphabet_size::Integer)
         no_input_hmms=search_replicates * length(params_dict)
-        code_dict = Dict{String, Array{Int64}}()
+        code_dict = Dict{String, Array{Integer}}()
 
         @showprogress 1 "Encoding observations..." for (partition_id, partition) in training_sets #build the appropriate sample sets once
             K,order_no=params_dict[partition_id]
